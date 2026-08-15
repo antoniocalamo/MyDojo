@@ -279,6 +279,11 @@
             (isLogin ? "Entra" : "Crea account") +
           '</button>' +
         '</form>' +
+        (isLogin ? "" :
+          '<p style="text-align:center;color:var(--text-dim);font-size:13px;margin-top:10px;">' +
+            'Dopo la registrazione riceverai una email da <strong>Supabase</strong> (il servizio che gestisce gli account di questa app) per confermare il tuo indirizzo — è normale, non è spam.' +
+          '</p>'
+        ) +
         '<p style="text-align:center;margin-top:16px;">' +
           (isLogin ? "Non hai un account? " : "Hai già un account? ") +
           '<button class="link-btn" data-action="toggle-auth-mode">' + (isLogin ? "Registrati" : "Accedi") + '</button>' +

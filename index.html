@@ -1003,7 +1003,7 @@
       state.authError = "";
       var call = state.authMode === "login"
         ? sb.auth.signInWithPassword({ email: email, password: password })
-        : sb.auth.signUp({ email: email, password: password });
+        : sb.auth.signUp({ email: email, password: password, options: { emailRedirectTo: window.location.origin + window.location.pathname } });
       return call.then(function (res) {
         if (res.error) { state.authError = res.error.message; return; }
         if (state.authMode === "signup" && res.data && res.data.user && !res.data.session) {

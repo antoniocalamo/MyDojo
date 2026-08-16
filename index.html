@@ -590,7 +590,8 @@
     return '' +
       '<main class="screen" style="padding-top:50px;">' +
         '<img src="' + logoSrc + '" alt="My Dojo" style="display:block;width:140px;margin:0 auto 8px;">' +
-        '<p style="text-align:center;color:var(--text-dim);margin-top:0;margin-bottom:28px;">Le tue schede, i tuoi progressi.</p>' +
+        '<h1 style="text-align:center;font-size:26px;font-weight:800;letter-spacing:0.08em;margin:2px 0 4px;">MY DOJO</h1>' +
+        '<p style="text-align:center;font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-dim);margin:0 0 24px;">Esercizio &bull; Equilibrio &bull; Crescita</p>' +
         (state.authError ? '<div class="error-msg">' + escapeHtml(state.authError) + '</div>' : '') +
         '<form data-action="submit-auth">' +
           '<label>Email</label>' +

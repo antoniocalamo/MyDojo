@@ -304,6 +304,30 @@
 
   h3.section-title { font-size: 15px; font-weight: 800; margin: 22px 0 10px; }
 
+  /* header in cima alle pagine principali */
+  header.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px 4px;
+  }
+  header.app-header .logo-mark { width: 34px; height: 34px; object-fit: contain; flex-shrink: 0; }
+  header.app-header .header-title { font-size: 17px; font-weight: 800; margin: 0; text-align: center; flex: 1; }
+  header.app-header .profile-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text);
+    flex-shrink: 0;
+  }
+  header.app-header .profile-btn svg { width: 19px; height: 19px; }
+
   /* circuito a tempo */
   .circuit-progress { color: var(--text-dim); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin: 4px 0 10px; }
   .circuit-phase-tag { display: inline-block; padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; margin-bottom: 12px; }
@@ -348,7 +372,8 @@
   var NAV_ICONS = {
     schede: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"></rect><line x1="8" y1="8" x2="16" y2="8"></line><line x1="8" y1="12" x2="16" y2="12"></line><line x1="8" y1="16" x2="12" y2="16"></line></svg>',
     storico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="20" x2="5" y2="12"></line><line x1="12" y1="20" x2="12" y2="6"></line><line x1="19" y1="20" x2="19" y2="15"></line></svg>',
-    profilo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg>'
+    profilo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg>',
+    benessere: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4-2-7-6-7-11a7 7 0 0 1 7-7c0 6 3 9 7 9a7 7 0 0 1-7 9z"></path><line x1="12" y1="21" x2="12" y2="13"></line></svg>'
   };
 
   var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -549,8 +574,9 @@
       return;
     }
 
-    var tabs = ["home", "history", "profile"];
+    var tabs = ["home", "history", "benessere"];
     var showNav = tabs.indexOf(state.view) !== -1;
+    var tabTitles = { home: "Schede", history: "Storico", benessere: "Benessere" };
     var body = "";
     if (state.view === "home") body = renderHome();
     else if (state.view === "template") body = renderTemplateEditor();
@@ -560,9 +586,11 @@
     else if (state.view === "profile") body = renderProfile();
     else if (state.view === "presets") body = renderPresets();
     else if (state.view === "presetDetail") body = renderPresetDetail();
+    else if (state.view === "benessere") body = renderBenessere();
     else body = renderHome();
 
     app.innerHTML =
+      (showNav ? renderScreenHeader(tabTitles[state.view]) : "") +
       '<main class="screen">' + body + '</main>' +
       (showNav ? renderBottomNav() : "");
 
@@ -570,6 +598,15 @@
       startWorkoutTimer(state.activeSession.started_at);
       if (isCircuitSession()) startCircuitTimer();
     }
+  }
+
+  function renderScreenHeader(title) {
+    var logoSrc = state.theme === "scuro" ? LOGO_WHITE : LOGO_BLACK;
+    return '<header class="app-header">' +
+      '<img src="' + logoSrc + '" alt="My Dojo" class="logo-mark">' +
+      '<h1 class="header-title">' + escapeHtml(title) + '</h1>' +
+      '<button class="profile-btn" data-action="nav" data-view="profile">' + NAV_ICONS.profilo + '</button>' +
+    '</header>';
   }
 
   function renderBottomNav() {
@@ -580,7 +617,7 @@
     return '<nav class="bottom-nav">' +
       item("home", "schede", "Schede") +
       item("history", "storico", "Storico") +
-      item("profile", "profilo", "Profilo") +
+      item("benessere", "benessere", "Benessere") +
       '</nav>';
   }
 
@@ -615,7 +652,7 @@
   }
 
   function renderHome() {
-    var html = '<h1 class="page-title">Schede</h1><p class="page-sub">Le tue schede di allenamento</p>';
+    var html = '<p class="page-sub" style="margin-top:2px;">Le tue schede di allenamento</p>';
 
     if (state.activeSession) {
       html += '<div class="hero-card live" style="background:' + gradientFor(state.activeSession.template_id || state.activeSession.id) + ';" data-action="resume-session">' +
@@ -801,7 +838,7 @@
   }
 
   function renderHistory() {
-    var html = '<h1 class="page-title">Storico</h1><p class="page-sub">I tuoi allenamenti passati</p>';
+    var html = '<p class="page-sub" style="margin-top:2px;">I tuoi allenamenti passati</p>';
 
     html += '<div class="stats-row">' +
       '<div class="stat-tile"><span class="num">' + state.stats.count + '</span><span class="lbl">Allenamenti</span></div>' +
@@ -861,10 +898,20 @@
     return html;
   }
 
+  function renderBenessere() {
+    return '<p class="page-sub" style="margin-top:2px;">Yoga, mindfulness, respirazione</p>' +
+      '<div class="empty" style="padding-top:60px;">' +
+        '<div style="font-size:48px;margin-bottom:12px;">🧘</div>' +
+        '<p style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 6px;">Presto disponibile</p>' +
+        '<p style="max-width:280px;margin:0 auto;">Questa sezione sarà dedicata al tuo equilibrio mentale: esercizi di respirazione, meditazione guidata e stretching. Arriva in un prossimo aggiornamento.</p>' +
+      '</div>';
+  }
+
   function renderProfile() {
     var email = state.user.email || "";
     var initial = email.charAt(0).toUpperCase() || "?";
-    var html = '<div class="profile-header">' +
+    var html = '<button class="back-btn" data-action="go-home">←</button>' +
+      '<div class="profile-header">' +
       '<div class="avatar">' + escapeHtml(initial) + '</div>' +
       '<div class="email">' + escapeHtml(email) + '</div>' +
     '</div>';
@@ -1188,6 +1235,12 @@
     });
   }
 
+  function openBenessere() {
+    state.authError = "";
+    state.view = "benessere";
+    render();
+  }
+
   function openPresets() {
     withBusy(function () {
       state.authError = "";
@@ -1277,6 +1330,7 @@
       if (view === "home") goHome();
       else if (view === "history") openHistory();
       else if (view === "profile") openProfile();
+      else if (view === "benessere") openBenessere();
     }
     else if (action === "go-home") goHome();
     else if (action === "new-template") newTemplate();

@@ -1059,13 +1059,15 @@
     });
   }
 
-  function goHome() {
-    withBusy(function () {
-      state.authError = "";
-      return Promise.all([loadTemplates(), loadActiveSession(), loadHistory()]).then(function () {
-        state.view = "home";
-      });
+  function loadHomeData() {
+    state.authError = "";
+    return Promise.all([loadTemplates(), loadActiveSession(), loadHistory()]).then(function () {
+      state.view = "home";
     });
+  }
+
+  function goHome() {
+    withBusy(loadHomeData);
   }
 
   function handleSubmitAuth(form) {
@@ -1081,6 +1083,13 @@
         if (state.authMode === "signup" && res.data && res.data.user && !res.data.session) {
           state.authError = "Controlla la tua email per confermare l'account (il messaggio arriva da Supabase, il servizio che gestisce gli account di questa app — non è spam), poi accedi.";
           state.authMode = "login";
+          return;
+        }
+        if (res.data && res.data.session) {
+          console.log("[My Dojo] login riuscito, carico i dati direttamente");
+          booted = true;
+          state.user = res.data.user;
+          return loadHomeData();
         }
       });
     });

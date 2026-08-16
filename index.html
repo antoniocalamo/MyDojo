@@ -594,7 +594,10 @@
 
     app.innerHTML =
       (showNav ? renderScreenHeader(tabTitles[state.view]) : "") +
-      '<main class="screen">' + body + '</main>' +
+      '<main class="screen">' +
+        (showNav && state.authError ? '<div class="error-msg">' + escapeHtml(state.authError) + '</div>' : "") +
+        body +
+      '</main>' +
       (showNav ? renderBottomNav() : "");
 
     if (state.view === "workout" && state.activeSession) {
@@ -1035,9 +1038,22 @@
   function withBusy(fn) {
     if (state.busy) return;
     state.busy = true;
+    var settled = false;
+    var watchdog = setTimeout(function () {
+      if (settled) return;
+      settled = true;
+      console.warn("[My Dojo] operazione bloccata troppo a lungo, sblocco l'app");
+      state.busy = false;
+      if (state.view === "loading") state.view = "auth";
+      state.authError = "L'operazione sta impiegando troppo tempo. Controlla la connessione e riprova.";
+      render();
+    }, 15000);
     return Promise.resolve().then(fn).catch(function (err) {
       state.authError = (err && err.message) || String(err);
     }).then(function () {
+      if (settled) return;
+      settled = true;
+      clearTimeout(watchdog);
       state.busy = false;
       render();
     });
@@ -1357,30 +1373,41 @@
 
   var booted = false;
 
-  sb.auth.onAuthStateChange(function (event, session) {
-    state.user = session ? session.user : null;
+  function handleAuthResolved(source, user) {
+    console.log("[My Dojo] auth risolto da:", source, user ? "loggato" : "non loggato");
     if (!booted) {
       booted = true;
-      if (state.user) goHome();
+      state.user = user;
+      if (user) goHome();
       else { state.view = "auth"; render(); }
-    } else if (!state.user) {
-      state.view = "auth";
-      render();
-    } else if (state.view === "auth" || state.view === "loading") {
-      goHome();
+    } else {
+      state.user = user;
+      if (!user) { state.view = "auth"; render(); }
+      else if (state.view === "auth" || state.view === "loading") { goHome(); }
     }
+  }
+
+  sb.auth.onAuthStateChange(function (event, session) {
+    handleAuthResolved("onAuthStateChange:" + event, session ? session.user : null);
   });
 
+  sb.auth.getSession().then(function (res) {
+    if (booted) return;
+    handleAuthResolved("getSession", res.data.session ? res.data.session.user : null);
+  }).catch(function (err) {
+    console.warn("[My Dojo] getSession fallita:", err);
+  });
+
+  // rete di sicurezza finale: se dopo alcuni secondi non è successo nulla,
+  // mostra la schermata di accesso invece di restare bloccati per sempre
   setTimeout(function () {
     if (booted) return;
-    sb.auth.getSession().then(function (res) {
-      if (booted) return;
-      booted = true;
-      state.user = res.data.session ? res.data.session.user : null;
-      if (state.user) goHome();
-      else { state.view = "auth"; render(); }
-    });
-  }, 3000);
+    console.warn("[My Dojo] boot bloccato, mostro comunque la schermata di accesso");
+    booted = true;
+    state.view = "auth";
+    state.authError = "Non sono riuscito a verificare l'accesso. Prova a entrare di nuovo.";
+    render();
+  }, 6000);
 })();
 </script>
 </body>

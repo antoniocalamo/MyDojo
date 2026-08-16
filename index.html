@@ -338,6 +338,75 @@
   .circuit-timer { font-size: 96px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
   .circuit-bar-track { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
   .circuit-bar-fill { height: 100%; background: var(--cta); border-radius: 999px; transition: width 1s linear; }
+
+  /* libreria esercizi */
+  select {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 13px 15px;
+    color: var(--text);
+    font-size: 15px;
+    margin-bottom: 12px;
+  }
+  select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+  .pill-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 10px; scrollbar-width: none; }
+  .pill-row::-webkit-scrollbar { display: none; }
+  .pill {
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .pill.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+  .exlib-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+  .exlib-card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 12px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .exlib-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+  .exlib-name { display: block; font-size: 14px; font-weight: 700; margin-bottom: 4px; line-height: 1.25; }
+  .exlib-muscle { display: block; font-size: 12px; color: var(--text-dim); }
+  .exlib-badge { position: absolute; top: 8px; right: 8px; font-size: 10px; padding: 3px 8px; background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border); }
+
+  .exlib-detail-banner {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 30px;
+    text-align: center;
+    font-size: 56px;
+    margin-bottom: 10px;
+  }
+
+  .muscle-list { margin-bottom: 6px; }
+  .muscle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .muscle-dots { color: var(--accent); letter-spacing: 2px; }
+
+  .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 14px; }
+  .checkbox-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); font-weight: 500; cursor: pointer; margin-bottom: 0; }
+  .checkbox-item input { width: auto; margin: 0; }
 </style>
 </head>
 <body>
@@ -378,6 +447,20 @@
 
   var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+  var MUSCLE_GROUPS = ["Petto", "Schiena", "Spalle", "Bicipiti", "Tricipiti", "Avambracci", "Addominali", "Quadricipiti", "Femorali", "Glutei", "Polpacci", "Corpo intero"];
+  var EQUIPMENT_TYPES = ["Corpo libero", "Manubri", "Bilanciere", "Kettlebell", "Macchina", "Cavi", "Elastico", "Sbarra"];
+  var DIFFICULTY_LEVELS = ["Principiante", "Intermedio", "Avanzato"];
+  var EQUIPMENT_ICONS = {
+    "Corpo libero": "🤸",
+    "Manubri": "🏋️",
+    "Bilanciere": "🏋️‍♂️",
+    "Kettlebell": "🔔",
+    "Macchina": "⚙️",
+    "Cavi": "🔗",
+    "Elastico": "➰",
+    "Sbarra": "🧗"
+  };
+
   var state = {
     user: null,
     view: "loading",
@@ -389,6 +472,12 @@
     currentTemplateExercises: [],
     activeSession: null,
     sessionExercises: [],
+    libraryExercises: [],
+    libraryFilterMuscle: null,
+    libraryFilterEquipment: null,
+    libraryPickMode: false,
+    currentLibraryExercise: null,
+    libraryForm: null,
     sessionSets: [],
     history: [],
     historyDetail: null,
@@ -574,7 +663,7 @@
       return;
     }
 
-    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "presets", "presetDetail", "benessere"];
+    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "presets", "presetDetail", "benessere", "library", "libraryDetail", "libraryForm"];
     if (knownViews.indexOf(state.view) === -1) state.view = "home";
 
     var tabs = ["home", "history", "benessere"];
@@ -590,6 +679,9 @@
     else if (state.view === "presets") body = renderPresets();
     else if (state.view === "presetDetail") body = renderPresetDetail();
     else if (state.view === "benessere") body = renderBenessere();
+    else if (state.view === "library") body = renderLibrary();
+    else if (state.view === "libraryDetail") body = renderLibraryDetail();
+    else if (state.view === "libraryForm") body = renderLibraryForm();
     else body = renderHome();
 
     app.innerHTML =
@@ -685,6 +777,7 @@
       });
     }
 
+    html += '<button class="btn btn-ghost" data-action="open-library" style="margin-bottom:10px;">📚 Libreria esercizi</button>';
     html += '<div class="btn-row">' +
       '<button class="btn btn-ghost" data-action="open-presets">📋 Schede pronte</button>' +
       '<button class="btn btn-accent" data-action="new-template">+ Nuova</button>' +
@@ -732,6 +825,140 @@
     return html;
   }
 
+  function pillButton(label, action, value, active) {
+    return '<button class="pill' + (active ? " active" : "") + '" data-action="' + action + '" data-value="' + escapeHtml(value) + '">' + escapeHtml(label) + '</button>';
+  }
+
+  function equipmentIcon(eq) {
+    return EQUIPMENT_ICONS[eq] || "💪";
+  }
+
+  function renderLibrary() {
+    var html = state.libraryPickMode
+      ? '<button class="back-btn" data-action="open-template" data-id="' + state.currentTemplate.id + '">←</button>'
+      : '<button class="back-btn" data-action="go-home">←</button>';
+    html += '<h1 class="page-title">Libreria esercizi</h1>';
+    html += '<p class="page-sub">' + (state.libraryPickMode ? "Scegli un esercizio da aggiungere alla scheda" : "Come si fanno e quali muscoli coinvolgono") + '</p>';
+
+    html += '<div class="pill-row">' +
+      pillButton("Tutti i muscoli", "filter-muscle", "", !state.libraryFilterMuscle) +
+      MUSCLE_GROUPS.map(function (m) { return pillButton(m, "filter-muscle", m, state.libraryFilterMuscle === m); }).join("") +
+    '</div>';
+    html += '<div class="pill-row">' +
+      pillButton("Tutti gli attrezzi", "filter-equipment", "", !state.libraryFilterEquipment) +
+      EQUIPMENT_TYPES.map(function (eq) { return pillButton(eq, "filter-equipment", eq, state.libraryFilterEquipment === eq); }).join("") +
+    '</div>';
+
+    var list = state.libraryExercises.filter(function (ex) {
+      if (state.libraryFilterMuscle && ex.muscle_primary !== state.libraryFilterMuscle) return false;
+      if (state.libraryFilterEquipment && ex.equipment !== state.libraryFilterEquipment) return false;
+      return true;
+    });
+
+    if (list.length === 0) {
+      html += '<div class="empty">Nessun esercizio trovato con questi filtri.</div>';
+    } else {
+      html += '<div class="exlib-grid">';
+      list.forEach(function (ex) {
+        var action = state.libraryPickMode ? "pick-library-exercise" : "open-library-detail";
+        html += '<div class="exlib-card" data-action="' + action + '" data-id="' + ex.id + '">' +
+          (ex.user_id ? '<span class="tag exlib-badge">Personale</span>' : '') +
+          '<span class="exlib-icon">' + equipmentIcon(ex.equipment) + '</span>' +
+          '<span class="exlib-name">' + escapeHtml(ex.name) + '</span>' +
+          '<span class="exlib-muscle">' + escapeHtml(ex.muscle_primary) + '</span>' +
+        '</div>';
+      });
+      html += '</div>';
+    }
+
+    if (!state.libraryPickMode) {
+      html += '<button class="btn btn-accent" data-action="new-library-exercise" style="margin-top:16px;">+ Aggiungi un tuo esercizio</button>';
+    }
+    return html;
+  }
+
+  function muscleRow(muscle, primary) {
+    var filled = primary ? 5 : 3;
+    var dots = "";
+    for (var i = 0; i < 5; i++) dots += (i < filled ? "●" : "○");
+    return '<div class="muscle-row"><span>' + escapeHtml(muscle) +
+      (primary ? ' <span class="tag tag-solid" style="font-size:10px;">Primario</span>' : '') +
+      '</span><span class="muscle-dots">' + dots + '</span></div>';
+  }
+
+  function renderLibraryDetail() {
+    var ex = state.currentLibraryExercise;
+    var html = '<button class="back-btn" data-action="back-to-library">←</button>';
+    html += '<div class="exlib-detail-banner">' + equipmentIcon(ex.equipment) + '</div>';
+    html += '<h1 class="page-title" style="margin-top:0;">' + escapeHtml(ex.name) + '</h1>';
+    html += '<div class="pill-row" style="margin-bottom:16px;">' +
+      '<span class="tag" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border);flex-shrink:0;">' + escapeHtml(ex.equipment) + '</span>' +
+      (ex.difficulty ? '<span class="tag" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border);flex-shrink:0;">' + escapeHtml(ex.difficulty) + '</span>' : '') +
+    '</div>';
+
+    html += '<h3 class="section-title">Muscoli lavorati</h3>';
+    html += '<div class="muscle-list">' + muscleRow(ex.muscle_primary, true);
+    (ex.muscles_secondary || []).forEach(function (m) { html += muscleRow(m, false); });
+    html += '</div>';
+
+    if (ex.instructions) {
+      html += '<h3 class="section-title">Come si fa</h3>';
+      html += '<p style="font-size:14px;line-height:1.5;color:var(--text);margin:0;">' + escapeHtml(ex.instructions) + '</p>';
+    }
+
+    if (ex.user_id) {
+      html += '<div class="btn-row" style="margin-top:24px;">' +
+        '<button class="btn btn-ghost btn-small" data-action="edit-library-exercise" data-id="' + ex.id + '">Modifica</button>' +
+        '<button class="btn btn-danger btn-small" data-action="delete-library-exercise" data-id="' + ex.id + '">Elimina</button>' +
+      '</div>';
+    }
+    return html;
+  }
+
+  function renderLibraryForm() {
+    var f = state.libraryForm;
+    var html = f.id
+      ? '<button class="back-btn" data-action="open-library-detail" data-id="' + f.id + '">←</button>'
+      : '<button class="back-btn" data-action="back-to-library">←</button>';
+    html += '<h1 class="page-title">' + (f.id ? "Modifica esercizio" : "Nuovo esercizio") + '</h1>';
+    if (state.authError) html += '<div class="error-msg">' + escapeHtml(state.authError) + '</div>';
+
+    html += '<form data-action="save-library-exercise">' +
+      '<label>Nome esercizio</label>' +
+      '<input type="text" name="name" value="' + escapeHtml(f.name || "") + '" required>' +
+
+      '<label>Gruppo muscolare primario</label>' +
+      '<select name="muscle_primary">' +
+        MUSCLE_GROUPS.map(function (m) { return '<option value="' + escapeHtml(m) + '" ' + (f.muscle_primary === m ? "selected" : "") + '>' + escapeHtml(m) + '</option>'; }).join("") +
+      '</select>' +
+
+      '<label>Muscoli secondari (facoltativo)</label>' +
+      '<div class="checkbox-grid">' +
+        MUSCLE_GROUPS.map(function (m) {
+          var checked = (f.muscles_secondary || []).indexOf(m) !== -1;
+          return '<label class="checkbox-item"><input type="checkbox" name="muscles_secondary" value="' + escapeHtml(m) + '" ' + (checked ? "checked" : "") + '>' + escapeHtml(m) + '</label>';
+        }).join("") +
+      '</div>' +
+
+      '<label>Attrezzatura</label>' +
+      '<select name="equipment">' +
+        EQUIPMENT_TYPES.map(function (eq) { return '<option value="' + escapeHtml(eq) + '" ' + (f.equipment === eq ? "selected" : "") + '>' + escapeHtml(eq) + '</option>'; }).join("") +
+      '</select>' +
+
+      '<label>Difficoltà (facoltativa)</label>' +
+      '<select name="difficulty">' +
+        '<option value="">—</option>' +
+        DIFFICULTY_LEVELS.map(function (d) { return '<option value="' + escapeHtml(d) + '" ' + (f.difficulty === d ? "selected" : "") + '>' + escapeHtml(d) + '</option>'; }).join("") +
+      '</select>' +
+
+      '<label>Istruzioni (come si esegue, facoltativo)</label>' +
+      '<textarea name="instructions" rows="4">' + escapeHtml(f.instructions || "") + '</textarea>' +
+
+      '<button class="btn btn-accent" type="submit">Salva</button>' +
+    '</form>';
+    return html;
+  }
+
   function renderTemplateEditor() {
     var t = state.currentTemplate;
     var html = '<button class="back-btn" data-action="go-home">←</button>';
@@ -752,13 +979,14 @@
       } else {
         state.currentTemplateExercises.forEach(function (ex) {
           html += '<div class="exercise-row">' +
-            '<span class="name">' + escapeHtml(ex.name) + '</span>' +
+            '<span class="name">' + (ex.library_exercise_id ? "📚 " : "") + escapeHtml(ex.name) + '</span>' +
             '<button data-action="delete-exercise" data-id="' + ex.id + '">&times;</button>' +
           '</div>';
         });
       }
+      html += '<button class="btn btn-ghost btn-small" data-action="open-library-pick" style="margin-top:4px;">📚 Scegli dalla libreria</button>';
       html += '<form class="inline-add" data-action="add-exercise">' +
-        '<input type="text" name="exname" placeholder="Nome esercizio" required>' +
+        '<input type="text" name="exname" placeholder="Oppure scrivi un nome libero" required>' +
         '<button class="btn btn-accent" type="submit">+</button>' +
       '</form>';
 
@@ -1030,6 +1258,14 @@
       .then(function (res) {
         if (res.error) throw res.error;
         state.currentPresetExercises = res.data;
+      });
+  }
+
+  function loadLibraryExercises() {
+    return sb.from("exercises").select("*").order("name", { ascending: true })
+      .then(function (res) {
+        if (res.error) throw res.error;
+        state.libraryExercises = res.data;
       });
   }
 
@@ -1313,6 +1549,115 @@
     });
   }
 
+  function openLibrary(pickMode) {
+    withBusy(function () {
+      state.authError = "";
+      state.libraryPickMode = !!pickMode;
+      state.libraryFilterMuscle = null;
+      state.libraryFilterEquipment = null;
+      state.view = "library";
+      return loadLibraryExercises();
+    });
+  }
+
+  function openLibraryDetail(id) {
+    var ex = state.libraryExercises.filter(function (x) { return x.id === id; })[0];
+    if (!ex) return;
+    state.authError = "";
+    state.currentLibraryExercise = ex;
+    state.view = "libraryDetail";
+    render();
+  }
+
+  function newLibraryExercise() {
+    state.authError = "";
+    state.libraryForm = { id: null, name: "", muscle_primary: MUSCLE_GROUPS[0], muscles_secondary: [], equipment: EQUIPMENT_TYPES[0], difficulty: "", instructions: "" };
+    state.view = "libraryForm";
+    render();
+  }
+
+  function editLibraryExercise(id) {
+    var ex = state.libraryExercises.filter(function (x) { return x.id === id; })[0];
+    if (!ex) return;
+    state.authError = "";
+    state.libraryForm = {
+      id: ex.id,
+      name: ex.name,
+      muscle_primary: ex.muscle_primary,
+      muscles_secondary: ex.muscles_secondary || [],
+      equipment: ex.equipment,
+      difficulty: ex.difficulty || "",
+      instructions: ex.instructions || ""
+    };
+    state.view = "libraryForm";
+    render();
+  }
+
+  function saveLibraryExercise(form) {
+    withBusy(function () {
+      state.authError = "";
+      var secondary = Array.prototype.slice.call(form.querySelectorAll('input[name="muscles_secondary"]:checked')).map(function (el) { return el.value; });
+      var payload = {
+        name: form.name.value.trim(),
+        muscle_primary: form.muscle_primary.value,
+        muscles_secondary: secondary,
+        equipment: form.equipment.value,
+        difficulty: form.difficulty.value || null,
+        instructions: form.instructions.value.trim() || null
+      };
+      var f = state.libraryForm;
+      var call;
+      if (f.id) {
+        call = sb.from("exercises").update(payload).eq("id", f.id).select().single();
+      } else {
+        payload.user_id = state.user.id;
+        call = sb.from("exercises").insert(payload).select().single();
+      }
+      return call.then(function (res) {
+        if (res.error) throw res.error;
+        return loadLibraryExercises().then(function () {
+          state.currentLibraryExercise = res.data;
+          state.view = "libraryDetail";
+        });
+      });
+    });
+  }
+
+  function deleteLibraryExercise(id) {
+    if (!confirm("Eliminare questo esercizio dalla tua libreria?")) return;
+    withBusy(function () {
+      state.authError = "";
+      return sb.from("exercises").delete().eq("id", id).then(function (res) {
+        if (res.error) throw res.error;
+        return loadLibraryExercises().then(function () {
+          state.view = "library";
+        });
+      });
+    });
+  }
+
+  function pickLibraryExercise(id) {
+    withBusy(function () {
+      state.authError = "";
+      var ex = state.libraryExercises.filter(function (x) { return x.id === id; })[0];
+      if (!ex) return;
+      var orderIndex = state.currentTemplateExercises.length;
+      return sb.from("template_exercises").insert({
+        user_id: state.user.id,
+        template_id: state.currentTemplate.id,
+        name: ex.name,
+        library_exercise_id: ex.id,
+        order_index: orderIndex
+      }).then(function (res) {
+        if (res.error) throw res.error;
+        return loadTemplateExercises(state.currentTemplate.id);
+      }).then(function () {
+        state.libraryPickMode = false;
+        state.view = "template";
+      });
+    });
+  }
+
   function setTheme(theme) {
     if (THEMES.indexOf(theme) === -1) return;
     state.theme = theme;
@@ -1339,7 +1684,7 @@
       var reps = parseInt(form.reps.value, 10);
       var weight = parseFloat(form.weight.value);
       if (!isNaN(reps) && !isNaN(weight)) addSet(exId, exName, reps, weight);
-    }
+    } else if (action === "save-library-exercise") saveLibraryExercise(form);
   });
 
   app.addEventListener("click", function (e) {
@@ -1376,6 +1721,16 @@
     else if (action === "clone-preset") clonePreset();
     else if (action === "circuit-pause") toggleCircuitPause();
     else if (action === "circuit-skip") skipCircuitPhase();
+    else if (action === "open-library") openLibrary(false);
+    else if (action === "open-library-pick") openLibrary(true);
+    else if (action === "back-to-library") { state.view = "library"; render(); }
+    else if (action === "open-library-detail") openLibraryDetail(id);
+    else if (action === "pick-library-exercise") pickLibraryExercise(id);
+    else if (action === "new-library-exercise") newLibraryExercise();
+    else if (action === "edit-library-exercise") editLibraryExercise(id);
+    else if (action === "delete-library-exercise") deleteLibraryExercise(id);
+    else if (action === "filter-muscle") { state.libraryFilterMuscle = el.getAttribute("data-value") || null; render(); }
+    else if (action === "filter-equipment") { state.libraryFilterEquipment = el.getAttribute("data-value") || null; render(); }
   });
 
   // ---------- boot ----------

@@ -52,6 +52,10 @@ storico e progressi nel tempo.
   appena una modifica è pronta e verificata, senza chiedermi conferma ogni
   volta — a meno che non sia io a chiederti esplicitamente in anticipo un
   mockup o un test preventivo prima di renderla definitiva.
+- **Modifiche al database (SQL): niente file nel repository.** Quando serve
+  una modifica allo schema Supabase, non creare/committare un file `.sql` —
+  scrivimi il codice SQL direttamente nella chat, così lo copio e incollo io
+  a mano nel pannello Supabase (SQL Editor).
 
 ## Come mi piace lavorare
 - Spiegazioni chiare e dirette, senza fronzoli.

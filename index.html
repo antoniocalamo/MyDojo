@@ -1150,6 +1150,7 @@
       '<button class="btn btn-ghost" data-action="circuit-pause">' + (c.paused ? "▶ Riprendi" : "⏸ Pausa") + '</button>' +
       '<button class="btn btn-accent" data-action="circuit-skip">Salta ⏭</button>' +
     '</div>';
+    html += '<button class="btn btn-danger btn-small" data-action="cancel-session" style="width:100%;margin-top:10px;">Annulla allenamento</button>';
 
     return html;
   }
@@ -1188,6 +1189,7 @@
       '</div>';
     });
 
+    html += '<button class="btn btn-danger btn-small" data-action="cancel-session" style="width:100%;margin-top:4px;">Annulla allenamento</button>';
     html += '<div style="height:70px;"></div>';
     html += '<div class="fixed-cta"><button class="btn btn-cta" data-action="finish-session">Termina allenamento</button></div>';
     return html;
@@ -1250,6 +1252,10 @@
         });
         html += '</ul></div>';
       });
+    }
+
+    if (s.finished_at) {
+      html += '<button class="btn btn-danger" data-action="delete-session" data-id="' + s.id + '" style="margin-top:24px;">Elimina allenamento</button>';
     }
     return html;
   }
@@ -1639,6 +1645,22 @@
     });
   }
 
+  function cancelSession() {
+    if (!confirm("Annullare questo allenamento? Le serie già registrate andranno perse e non verrà salvato nelle statistiche.")) return;
+    withBusy(function () {
+      state.authError = "";
+      var id = state.activeSession.id;
+      return sb.from("workout_sessions").delete().eq("id", id).then(function (res) {
+        if (res.error) throw res.error;
+        state.activeSession = null;
+        state.sessionExercises = [];
+        state.sessionSets = [];
+        state.circuit = null;
+        state.view = "home";
+      });
+    });
+  }
+
   function openHistory() {
     withBusy(function () {
       state.authError = "";
@@ -1653,6 +1675,19 @@
       state.historyDetail = s;
       state.view = "historyDetail";
       return loadHistoryDetail(id, s.template_id);
+    });
+  }
+
+  function deleteSession(id) {
+    if (!confirm("Eliminare questo allenamento dalle statistiche? L'operazione non è reversibile.")) return;
+    withBusy(function () {
+      state.authError = "";
+      return sb.from("workout_sessions").delete().eq("id", id).then(function (res) {
+        if (res.error) throw res.error;
+        return loadHistory();
+      }).then(function () {
+        state.view = "history";
+      });
     });
   }
 
@@ -1912,6 +1947,8 @@
     else if (action === "edit-plan") editPlan();
     else if (action === "plan-cancel-edit") { state.view = "plan"; render(); }
     else if (action === "back-from-profile") backFromProfile();
+    else if (action === "cancel-session") cancelSession();
+    else if (action === "delete-session") deleteSession(id);
   });
 
   // ---------- boot ----------

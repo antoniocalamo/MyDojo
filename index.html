@@ -1352,21 +1352,30 @@
 
   // ---------- boot ----------
 
+  var booted = false;
+
   sb.auth.onAuthStateChange(function (event, session) {
     state.user = session ? session.user : null;
-    if (!state.user) {
+    if (!booted) {
+      booted = true;
+      if (state.user) goHome();
+      else { state.view = "auth"; render(); }
+    } else if (!state.user) {
       state.view = "auth";
       render();
-    } else if (state.view === "loading" || state.view === "auth") {
-      goHome();
     }
   });
 
-  sb.auth.getSession().then(function (res) {
-    state.user = res.data.session ? res.data.session.user : null;
-    if (state.user) goHome();
-    else { state.view = "auth"; render(); }
-  });
+  setTimeout(function () {
+    if (booted) return;
+    sb.auth.getSession().then(function (res) {
+      if (booted) return;
+      booted = true;
+      state.user = res.data.session ? res.data.session.user : null;
+      if (state.user) goHome();
+      else { state.view = "auth"; render(); }
+    });
+  }, 3000);
 })();
 </script>
 </body>

@@ -703,7 +703,7 @@
 
     var tabs = ["plan", "home", "benessere", "history"];
     var showNav = tabs.indexOf(state.view) !== -1;
-    var tabTitles = { plan: "Il mio piano", home: "Allenamenti", history: "Statistiche", benessere: "Benessere" };
+    var tabTitles = { plan: "Il mio piano", home: "Corpo", history: "Statistiche", benessere: "Mente" };
     var body = "";
     if (state.view === "plan") body = renderPlan();
     else if (state.view === "planEdit") body = renderPlanEdit();
@@ -751,8 +751,8 @@
     }
     return '<nav class="bottom-nav">' +
       item("plan", "piano", "Il mio piano") +
-      item("home", "schede", "Allenamenti") +
-      item("benessere", "benessere", "Benessere") +
+      item("home", "schede", "Corpo") +
+      item("benessere", "benessere", "Mente") +
       item("history", "storico", "Statistiche") +
       '</nav>';
   }
@@ -849,7 +849,7 @@
     if (state.authError) html += '<div class="error-msg">' + escapeHtml(state.authError) + '</div>';
 
     if (state.templates.length === 0) {
-      html += '<div class="empty">Non hai ancora nessuna scheda da assegnare.<br>Creane una prima nel tab "Allenamenti".</div>';
+      html += '<div class="empty">Non hai ancora nessuna scheda da assegnare.<br>Creane una prima nel tab "Corpo".</div>';
       return html;
     }
 

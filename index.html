@@ -513,6 +513,7 @@
     currentLibraryExercise: null,
     libraryForm: null,
     weeklyPlan: [],
+    profileReturnTab: null,
     sessionSets: [],
     history: [],
     historyDetail: null,
@@ -1265,7 +1266,7 @@
   function renderProfile() {
     var email = state.user.email || "";
     var initial = email.charAt(0).toUpperCase() || "?";
-    var html = '<button class="back-btn" data-action="go-home">←</button>' +
+    var html = '<button class="back-btn" data-action="back-from-profile">←</button>' +
       '<div class="profile-header">' +
       '<div class="avatar">' + escapeHtml(initial) + '</div>' +
       '<div class="email">' + escapeHtml(email) + '</div>' +
@@ -1656,10 +1657,22 @@
   }
 
   function openProfile() {
+    var fromTab = state.view;
     withBusy(function () {
       state.authError = "";
-      return loadHistory().then(function () { state.view = "profile"; });
+      return loadHistory().then(function () {
+        state.profileReturnTab = fromTab;
+        state.view = "profile";
+      });
     });
+  }
+
+  function backFromProfile() {
+    var target = state.profileReturnTab || "plan";
+    if (target === "home") goHome();
+    else if (target === "benessere") openBenessere();
+    else if (target === "history") openHistory();
+    else goPlan();
   }
 
   function openBenessere() {
@@ -1898,6 +1911,7 @@
     else if (action === "filter-equipment") { state.libraryFilterEquipment = el.getAttribute("data-value") || null; render(); }
     else if (action === "edit-plan") editPlan();
     else if (action === "plan-cancel-edit") { state.view = "plan"; render(); }
+    else if (action === "back-from-profile") backFromProfile();
   });
 
   // ---------- boot ----------

@@ -574,6 +574,9 @@
       return;
     }
 
+    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "presets", "presetDetail", "benessere"];
+    if (knownViews.indexOf(state.view) === -1) state.view = "home";
+
     var tabs = ["home", "history", "benessere"];
     var showNav = tabs.indexOf(state.view) !== -1;
     var tabTitles = { home: "Schede", history: "Storico", benessere: "Benessere" };
@@ -1363,6 +1366,8 @@
     } else if (!state.user) {
       state.view = "auth";
       render();
+    } else if (state.view === "auth" || state.view === "loading") {
+      goHome();
     }
   });
 

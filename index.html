@@ -407,6 +407,37 @@
   .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 14px; }
   .checkbox-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); font-weight: 500; cursor: pointer; margin-bottom: 0; }
   .checkbox-item input { width: auto; margin: 0; }
+
+  /* il mio piano */
+  .plan-day {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 8px;
+  }
+  .plan-day.today { border-color: var(--accent); border-width: 2px; }
+  .plan-day.clickable { cursor: pointer; }
+  .plan-check {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--ok);
+    font-weight: 800;
+  }
+  .plan-check.done { border-color: var(--ok); background: rgba(22,163,74,0.12); }
+  .plan-day-info { display: flex; flex-direction: column; gap: 2px; }
+  .plan-day-name { font-size: 14px; font-weight: 700; }
+  .plan-day-workout { font-size: 13px; color: var(--text-dim); }
 </style>
 </head>
 <body>
@@ -442,8 +473,11 @@
     schede: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"></rect><line x1="8" y1="8" x2="16" y2="8"></line><line x1="8" y1="12" x2="16" y2="12"></line><line x1="8" y1="16" x2="12" y2="16"></line></svg>',
     storico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="20" x2="5" y2="12"></line><line x1="12" y1="20" x2="12" y2="6"></line><line x1="19" y1="20" x2="19" y2="15"></line></svg>',
     profilo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg>',
-    benessere: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4-2-7-6-7-11a7 7 0 0 1 7-7c0 6 3 9 7 9a7 7 0 0 1-7 9z"></path><line x1="12" y1="21" x2="12" y2="13"></line></svg>'
+    benessere: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-4-2-7-6-7-11a7 7 0 0 1 7-7c0 6 3 9 7 9a7 7 0 0 1-7 9z"></path><line x1="12" y1="21" x2="12" y2="13"></line></svg>',
+    piano: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="16" y1="2" x2="16" y2="6"></line><path d="M8 14l2.5 2.5L16 11"></path></svg>'
   };
+
+  var WEEKDAY_NAMES = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
 
   var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -478,6 +512,7 @@
     libraryPickMode: false,
     currentLibraryExercise: null,
     libraryForm: null,
+    weeklyPlan: [],
     sessionSets: [],
     history: [],
     historyDetail: null,
@@ -663,14 +698,16 @@
       return;
     }
 
-    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "presets", "presetDetail", "benessere", "library", "libraryDetail", "libraryForm"];
-    if (knownViews.indexOf(state.view) === -1) state.view = "home";
+    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "presets", "presetDetail", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEdit"];
+    if (knownViews.indexOf(state.view) === -1) state.view = "plan";
 
-    var tabs = ["home", "history", "benessere"];
+    var tabs = ["plan", "home", "benessere", "history"];
     var showNav = tabs.indexOf(state.view) !== -1;
-    var tabTitles = { home: "Schede", history: "Storico", benessere: "Benessere" };
+    var tabTitles = { plan: "Il mio piano", home: "Allenamenti", history: "Statistiche", benessere: "Benessere" };
     var body = "";
-    if (state.view === "home") body = renderHome();
+    if (state.view === "plan") body = renderPlan();
+    else if (state.view === "planEdit") body = renderPlanEdit();
+    else if (state.view === "home") body = renderHome();
     else if (state.view === "template") body = renderTemplateEditor();
     else if (state.view === "workout") body = renderWorkout();
     else if (state.view === "history") body = renderHistory();
@@ -713,9 +750,10 @@
         NAV_ICONS[key] + '<span>' + label + '</span></button>';
     }
     return '<nav class="bottom-nav">' +
-      item("home", "schede", "Schede") +
-      item("history", "storico", "Storico") +
+      item("plan", "piano", "Il mio piano") +
+      item("home", "schede", "Allenamenti") +
       item("benessere", "benessere", "Benessere") +
+      item("history", "storico", "Statistiche") +
       '</nav>';
   }
 
@@ -747,6 +785,89 @@
           '<button class="link-btn" data-action="toggle-auth-mode">' + (isLogin ? "Registrati" : "Accedi") + '</button>' +
         '</p>' +
       '</main>';
+  }
+
+  function currentWeekdayIndex() {
+    var jsDay = new Date().getDay();
+    return (jsDay + 6) % 7;
+  }
+
+  function startOfWeek() {
+    var now = new Date();
+    var start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - currentWeekdayIndex());
+    start.setHours(0, 0, 0, 0);
+    return start;
+  }
+
+  function isDayCompleted(templateId) {
+    if (!templateId) return false;
+    var weekStart = startOfWeek();
+    var weekEnd = new Date(weekStart.getTime() + 7 * 24 * 3600 * 1000);
+    return state.history.some(function (s) {
+      if (s.template_id !== templateId || !s.finished_at) return false;
+      var d = new Date(s.finished_at);
+      return d >= weekStart && d < weekEnd;
+    });
+  }
+
+  function renderPlan() {
+    var todayIdx = currentWeekdayIndex();
+    var html = '<p class="page-sub" style="margin-top:2px;">La tua settimana tipo</p>';
+
+    if (state.activeSession) {
+      html += '<div class="hero-card live" style="background:' + gradientFor(state.activeSession.template_id || state.activeSession.id) + ';" data-action="resume-session">' +
+        '<span class="hero-icon">🏋️</span>' +
+        '<span class="tag tag-solid" style="width:fit-content;margin-bottom:8px;">In corso</span>' +
+        '<p class="hero-title">' + escapeHtml(state.activeSession.template_name) + '</p>' +
+        '<p class="hero-meta">Iniziato il ' + formatDate(state.activeSession.started_at) + ' — tocca per riprendere</p>' +
+      '</div>';
+    }
+
+    WEEKDAY_NAMES.forEach(function (name, idx) {
+      var assignment = state.weeklyPlan.filter(function (p) { return p.weekday === idx; })[0];
+      var tpl = assignment && assignment.template_id ? state.templates.filter(function (t) { return t.id === assignment.template_id; })[0] : null;
+      var isToday = idx === todayIdx;
+      var done = tpl ? isDayCompleted(tpl.id) : false;
+      var clickable = tpl && !state.activeSession;
+      html += '<div class="plan-day' + (isToday ? " today" : "") + (clickable ? " clickable" : "") + '"' +
+        (clickable ? ' data-action="start-session" data-id="' + tpl.id + '"' : '') + '>' +
+        '<span class="plan-check' + (done ? " done" : "") + '">' + (done ? "✓" : "") + '</span>' +
+        '<div class="plan-day-info">' +
+          '<span class="plan-day-name">' + name + (isToday ? ' <span class="tag tag-solid" style="font-size:10px;">Oggi</span>' : '') + '</span>' +
+          '<span class="plan-day-workout">' + (tpl ? escapeHtml(tpl.name) : "Riposo") + '</span>' +
+        '</div>' +
+      '</div>';
+    });
+
+    html += '<button class="btn btn-ghost" data-action="edit-plan" style="margin-top:16px;">✏️ Modifica il piano settimanale</button>';
+    return html;
+  }
+
+  function renderPlanEdit() {
+    var html = '<button class="back-btn" data-action="plan-cancel-edit">←</button>';
+    html += '<h1 class="page-title">Modifica il piano</h1><p class="page-sub">Assegna una scheda a ogni giorno, oppure lascialo come giorno di riposo.</p>';
+    if (state.authError) html += '<div class="error-msg">' + escapeHtml(state.authError) + '</div>';
+
+    if (state.templates.length === 0) {
+      html += '<div class="empty">Non hai ancora nessuna scheda da assegnare.<br>Creane una prima nel tab "Allenamenti".</div>';
+      return html;
+    }
+
+    html += '<form data-action="save-plan">';
+    WEEKDAY_NAMES.forEach(function (name, idx) {
+      var assignment = state.weeklyPlan.filter(function (p) { return p.weekday === idx; })[0];
+      var currentTplId = assignment ? assignment.template_id : "";
+      html += '<label>' + name + '</label>';
+      html += '<select name="day-' + idx + '">' +
+        '<option value="">Riposo (nessuna scheda)</option>' +
+        state.templates.map(function (t) {
+          return '<option value="' + t.id + '" ' + (currentTplId === t.id ? "selected" : "") + '>' + escapeHtml(t.name) + '</option>';
+        }).join("") +
+      '</select>';
+    });
+    html += '<button class="btn btn-accent" type="submit">Salva piano</button>';
+    html += '</form>';
+    return html;
   }
 
   function renderHome() {
@@ -1261,6 +1382,14 @@
       });
   }
 
+  function loadWeeklyPlan() {
+    return sb.from("weekly_plan").select("*")
+      .then(function (res) {
+        if (res.error) throw res.error;
+        state.weeklyPlan = res.data;
+      });
+  }
+
   function loadLibraryExercises() {
     return sb.from("exercises").select("*").order("name", { ascending: true })
       .then(function (res) {
@@ -1306,6 +1435,40 @@
     withBusy(loadHomeData);
   }
 
+  function loadPlanData() {
+    state.authError = "";
+    return Promise.all([loadTemplates(), loadActiveSession(), loadWeeklyPlan(), loadHistory()]).then(function () {
+      state.view = "plan";
+    });
+  }
+
+  function goPlan() {
+    withBusy(loadPlanData);
+  }
+
+  function editPlan() {
+    state.authError = "";
+    state.view = "planEdit";
+    render();
+  }
+
+  function savePlan(form) {
+    withBusy(function () {
+      state.authError = "";
+      var rows = [];
+      for (var i = 0; i < 7; i++) {
+        var val = form["day-" + i].value;
+        rows.push({ user_id: state.user.id, weekday: i, template_id: val || null });
+      }
+      return sb.from("weekly_plan").upsert(rows, { onConflict: "user_id,weekday" }).then(function (res) {
+        if (res.error) throw res.error;
+        return loadWeeklyPlan();
+      }).then(function () {
+        state.view = "plan";
+      });
+    });
+  }
+
   function handleSubmitAuth(form) {
     var email = form.email.value.trim();
     var password = form.password.value;
@@ -1325,7 +1488,7 @@
           console.log("[My Dojo] login riuscito, carico i dati direttamente");
           booted = true;
           state.user = res.data.user;
-          return loadHomeData();
+          return loadPlanData();
         }
       });
     });
@@ -1685,6 +1848,7 @@
       var weight = parseFloat(form.weight.value);
       if (!isNaN(reps) && !isNaN(weight)) addSet(exId, exName, reps, weight);
     } else if (action === "save-library-exercise") saveLibraryExercise(form);
+    else if (action === "save-plan") savePlan(form);
   });
 
   app.addEventListener("click", function (e) {
@@ -1700,7 +1864,8 @@
     }
     else if (action === "nav") {
       var view = el.getAttribute("data-view");
-      if (view === "home") goHome();
+      if (view === "plan") goPlan();
+      else if (view === "home") goHome();
       else if (view === "history") openHistory();
       else if (view === "profile") openProfile();
       else if (view === "benessere") openBenessere();
@@ -1731,6 +1896,8 @@
     else if (action === "delete-library-exercise") deleteLibraryExercise(id);
     else if (action === "filter-muscle") { state.libraryFilterMuscle = el.getAttribute("data-value") || null; render(); }
     else if (action === "filter-equipment") { state.libraryFilterEquipment = el.getAttribute("data-value") || null; render(); }
+    else if (action === "edit-plan") editPlan();
+    else if (action === "plan-cancel-edit") { state.view = "plan"; render(); }
   });
 
   // ---------- boot ----------
@@ -1742,12 +1909,12 @@
     if (!booted) {
       booted = true;
       state.user = user;
-      if (user) goHome();
+      if (user) goPlan();
       else { state.view = "auth"; render(); }
     } else {
       state.user = user;
       if (!user) { state.view = "auth"; render(); }
-      else if (state.view === "auth" || state.view === "loading") { goHome(); }
+      else if (state.view === "auth" || state.view === "loading") { goPlan(); }
     }
   }
 

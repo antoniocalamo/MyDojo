@@ -1007,7 +1007,7 @@
       return call.then(function (res) {
         if (res.error) { state.authError = res.error.message; return; }
         if (state.authMode === "signup" && res.data && res.data.user && !res.data.session) {
-          state.authError = "Controlla la tua email per confermare l'account, poi accedi.";
+          state.authError = "Controlla la tua email per confermare l'account (il messaggio arriva da Supabase, il servizio che gestisce gli account di questa app — non è spam), poi accedi.";
           state.authMode = "login";
         }
       });

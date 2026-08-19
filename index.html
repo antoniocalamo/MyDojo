@@ -1175,7 +1175,7 @@
     var ex = state.currentLibraryExercise;
     var html = '<button class="back-btn" data-action="back-to-library">←</button>';
     if (isVideoUrl(ex.image_url)) {
-      html += '<video class="exlib-detail-video" src="' + escapeHtml(ex.image_url) + '" autoplay muted loop playsinline controls></video>';
+      html += '<video class="exlib-detail-video" src="' + escapeHtml(ex.image_url) + '" autoplay muted loop playsinline></video>';
     } else {
       html += '<div class="exlib-detail-banner">' + equipmentIcon(ex.equipment) + '</div>';
     }

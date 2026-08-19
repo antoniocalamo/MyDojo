@@ -524,6 +524,8 @@
     { key: "Riscaldamento, Recupero", emoji: "🤸" }
   ];
 
+  var ADMIN_EMAIL = "antonio.calamo@gmail.com";
+
   var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   var MUSCLE_GROUPS = ["Petto", "Schiena", "Spalle", "Bicipiti", "Tricipiti", "Avambracci", "Addominali", "Quadricipiti", "Femorali", "Glutei", "Polpacci", "Corpo intero"];
@@ -569,6 +571,8 @@
     currentCategory: null,
     currentWorkout: null,
     currentWorkoutExercises: [],
+    currentPresetAdmin: null,
+    currentPresetAdminExercises: [],
     workoutStartOptions: { warmup: false, silent: false },
     circuit: null,
     stats: { count: 0, hours: 0 },
@@ -605,6 +609,10 @@
 
   function vibrate(pattern) {
     try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
+  }
+
+  function isAdmin() {
+    return !!(state.user && state.user.email === ADMIN_EMAIL);
   }
 
   function escapeHtml(str) {
@@ -747,7 +755,7 @@
       return;
     }
 
-    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "categoryDetail", "workoutDetail", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEdit"];
+    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "categoryDetail", "workoutDetail", "presetAdmin", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEdit"];
     if (knownViews.indexOf(state.view) === -1) state.view = "plan";
 
     var tabs = ["plan", "home", "benessere", "history"];
@@ -764,6 +772,7 @@
     else if (state.view === "profile") body = renderProfile();
     else if (state.view === "categoryDetail") body = renderCategoryDetail();
     else if (state.view === "workoutDetail") body = renderWorkoutDetail();
+    else if (state.view === "presetAdmin") body = renderPresetAdmin();
     else if (state.view === "benessere") body = renderBenessere();
     else if (state.view === "library") body = renderLibrary();
     else if (state.view === "libraryDetail") body = renderLibraryDetail();
@@ -972,6 +981,9 @@
     }
 
     html += '<button class="btn btn-ghost" data-action="new-template-in-category" data-id="' + escapeHtml(cat) + '" style="margin-top:16px;">+ Nuovo obiettivo in questa categoria</button>';
+    if (isAdmin()) {
+      html += '<button class="btn btn-ghost" data-action="open-preset-admin" data-id="" style="margin-top:8px;">🛠️ Nuovo obiettivo nel catalogo (admin)</button>';
+    }
     return html;
   }
 
@@ -1017,10 +1029,58 @@
 
     if (w.kind === "template") {
       html += '<button class="btn btn-ghost" data-action="edit-workout-template" data-id="' + w.data.id + '" style="margin-top:14px;">✏️ Personalizza esercizi</button>';
+    } else if (isAdmin()) {
+      html += '<button class="btn btn-ghost" data-action="open-preset-admin" data-id="' + w.data.id + '" style="margin-top:14px;">🛠️ Modifica nel catalogo (admin)</button>';
     }
 
     html += '<div style="height:70px;"></div>';
     html += '<div class="fixed-cta"><button class="btn btn-cta" data-action="start-workout" ' + ((state.activeSession || exs.length === 0) ? "disabled" : "") + '>Inizio</button></div>';
+    return html;
+  }
+
+  function renderPresetAdmin() {
+    var p = state.currentPresetAdmin;
+    var html = '<button class="back-btn" data-action="open-category" data-id="' + escapeHtml(state.currentCategory || CATEGORIES[0].key) + '">←</button>';
+    html += '<h1 class="page-title">' + (p.id ? "Modifica obiettivo (catalogo)" : "Nuovo obiettivo nel catalogo") + '</h1>';
+    if (state.authError) html += '<div class="error-msg">' + escapeHtml(state.authError) + '</div>';
+
+    html += '<form data-action="save-preset-admin">' +
+      '<label>Nome obiettivo</label>' +
+      '<input type="text" name="name" value="' + escapeHtml(p.name || "") + '" required>' +
+      '<label>Descrizione</label>' +
+      '<textarea name="description" rows="2">' + escapeHtml(p.description || "") + '</textarea>' +
+      '<label>Categoria</label>' +
+      '<select name="category">' +
+        CATEGORIES.map(function (c) { return '<option value="' + escapeHtml(c.key) + '" ' + ((p.category || CATEGORIES[0].key) === c.key ? "selected" : "") + '>' + escapeHtml(c.key) + '</option>'; }).join("") +
+      '</select>' +
+      '<button class="btn btn-accent" type="submit">Salva</button>' +
+    '</form>';
+
+    if (p.id) {
+      html += '<h3 class="section-title">Esercizi</h3>';
+      if (state.currentPresetAdminExercises.length === 0) {
+        html += '<p class="page-sub" style="margin:0 0 8px;">Nessun esercizio ancora aggiunto.</p>';
+      } else {
+        state.currentPresetAdminExercises.forEach(function (ex) {
+          html += '<div class="exercise-row">' +
+            '<span class="name">' + escapeHtml(ex.name) + ' <span class="tag" style="background:var(--surface-2);color:var(--text-dim);">' + ex.duration_seconds + 's</span></span>' +
+            '<button data-action="delete-preset-exercise" data-id="' + ex.id + '">&times;</button>' +
+          '</div>';
+        });
+      }
+      html += '<form data-action="add-preset-exercise" style="margin-top:10px;">' +
+        '<label>Nome esercizio</label>' +
+        '<input type="text" name="exname" required>' +
+        '<label>Istruzioni (facoltative)</label>' +
+        '<textarea name="exinstructions" rows="2"></textarea>' +
+        '<label>Durata (secondi)</label>' +
+        '<input type="number" name="exduration" value="30" min="5" required>' +
+        '<button class="btn btn-accent btn-small" type="submit">+ Aggiungi esercizio</button>' +
+      '</form>';
+
+      html += '<button class="btn btn-danger" data-action="delete-preset-admin" data-id="' + p.id + '" style="margin-top:24px;">Elimina obiettivo dal catalogo</button>';
+    }
+
     return html;
   }
 
@@ -1105,7 +1165,7 @@
       html += '<p style="font-size:14px;line-height:1.5;color:var(--text);margin:0;">' + escapeHtml(ex.instructions) + '</p>';
     }
 
-    if (ex.user_id) {
+    if (ex.user_id || isAdmin()) {
       html += '<div class="btn-row" style="margin-top:24px;">' +
         '<button class="btn btn-ghost btn-small" data-action="edit-library-exercise" data-id="' + ex.id + '">Modifica</button>' +
         '<button class="btn btn-danger btn-small" data-action="delete-library-exercise" data-id="' + ex.id + '">Elimina</button>' +
@@ -1152,6 +1212,8 @@
 
       '<label>Istruzioni (come si esegue, facoltativo)</label>' +
       '<textarea name="instructions" rows="4">' + escapeHtml(f.instructions || "") + '</textarea>' +
+
+      (!f.id && isAdmin() ? '<label class="checkbox-item" style="margin-bottom:14px;"><input type="checkbox" name="is_global"> Aggiungi al catalogo comune (visibile a tutti)</label>' : '') +
 
       '<button class="btn btn-accent" type="submit">Salva</button>' +
     '</form>';
@@ -1860,6 +1922,93 @@
     });
   }
 
+  function openPresetAdmin(id) {
+    if (id) {
+      withBusy(function () {
+        state.authError = "";
+        var p = state.presets.filter(function (x) { return x.id === id; })[0];
+        state.currentPresetAdmin = p;
+        state.view = "presetAdmin";
+        return loadPresetExercises(id).then(function () {
+          state.currentPresetAdminExercises = state.currentPresetExercises;
+        });
+      });
+      return;
+    }
+    state.authError = "";
+    state.currentPresetAdmin = { id: null, name: "", description: "", category: state.currentCategory || CATEGORIES[0].key };
+    state.currentPresetAdminExercises = [];
+    state.view = "presetAdmin";
+    render();
+  }
+
+  function savePresetAdmin(name, description, category) {
+    withBusy(function () {
+      state.authError = "";
+      if (state.currentPresetAdmin.id) {
+        return sb.from("preset_templates").update({ name: name, description: description, category: category }).eq("id", state.currentPresetAdmin.id)
+          .then(function (res) {
+            if (res.error) throw res.error;
+            state.currentPresetAdmin.name = name;
+            state.currentPresetAdmin.description = description;
+            state.currentPresetAdmin.category = category;
+            state.currentCategory = category;
+            return loadPresets();
+          });
+      }
+      return sb.from("preset_templates").insert({ name: name, description: description, category: category }).select().single()
+        .then(function (res) {
+          if (res.error) throw res.error;
+          state.currentPresetAdmin = res.data;
+          state.currentCategory = category;
+          return loadPresets();
+        });
+    });
+  }
+
+  function addPresetExercise(name, instructions, duration) {
+    withBusy(function () {
+      state.authError = "";
+      var orderIndex = state.currentPresetAdminExercises.length;
+      return sb.from("preset_template_exercises").insert({
+        preset_template_id: state.currentPresetAdmin.id,
+        name: name,
+        instructions: instructions || null,
+        duration_seconds: duration,
+        order_index: orderIndex
+      }).then(function (res) {
+        if (res.error) throw res.error;
+        return loadPresetExercises(state.currentPresetAdmin.id).then(function () {
+          state.currentPresetAdminExercises = state.currentPresetExercises;
+        });
+      });
+    });
+  }
+
+  function deletePresetExercise(id) {
+    withBusy(function () {
+      state.authError = "";
+      return sb.from("preset_template_exercises").delete().eq("id", id).then(function (res) {
+        if (res.error) throw res.error;
+        return loadPresetExercises(state.currentPresetAdmin.id).then(function () {
+          state.currentPresetAdminExercises = state.currentPresetExercises;
+        });
+      });
+    });
+  }
+
+  function deletePresetAdmin(id) {
+    if (!confirm("Eliminare questo obiettivo dal catalogo comune? Sarà rimosso per tutti gli utenti.")) return;
+    withBusy(function () {
+      state.authError = "";
+      return sb.from("preset_templates").delete().eq("id", id).then(function (res) {
+        if (res.error) throw res.error;
+        state.view = "categoryDetail";
+        return loadPresets();
+      });
+    });
+  }
+
   var GENERIC_WARMUP = {
     normal: [
       { name: "Jumping Jacks", duration_seconds: 30, instructions: "Salta divaricando le gambe e alzando le braccia sopra la testa, poi torna alla posizione di partenza, a ritmo costante." },
@@ -2038,7 +2187,8 @@
       if (f.id) {
         call = sb.from("exercises").update(payload).eq("id", f.id).select().single();
       } else {
-        payload.user_id = state.user.id;
+        var makeGlobal = isAdmin() && form.is_global && form.is_global.checked;
+        payload.user_id = makeGlobal ? null : state.user.id;
         call = sb.from("exercises").insert(payload).select().single();
       }
       return call.then(function (res) {
@@ -2114,6 +2264,13 @@
       if (!isNaN(reps) && !isNaN(weight)) addSet(exId, exName, reps, weight);
     } else if (action === "save-library-exercise") saveLibraryExercise(form);
     else if (action === "save-plan") savePlan(form);
+    else if (action === "save-preset-admin") savePresetAdmin(form.name.value.trim(), form.description.value.trim(), form.category.value);
+    else if (action === "add-preset-exercise") {
+      var peName = form.exname.value.trim();
+      var peInstr = form.exinstructions.value.trim();
+      var peDuration = parseInt(form.exduration.value, 10);
+      if (peName && !isNaN(peDuration)) { addPresetExercise(peName, peInstr, peDuration); form.reset(); form.exduration.value = "30"; }
+    }
   });
 
   app.addEventListener("click", function (e) {
@@ -2151,6 +2308,9 @@
     else if (action === "open-workout") openWorkout(el.getAttribute("data-kind"), id);
     else if (action === "edit-workout-template") openTemplate(id);
     else if (action === "start-workout") startWorkout();
+    else if (action === "open-preset-admin") openPresetAdmin(id);
+    else if (action === "delete-preset-exercise") deletePresetExercise(id);
+    else if (action === "delete-preset-admin") deletePresetAdmin(id);
     else if (action === "toggle-warmup") { state.workoutStartOptions.warmup = !state.workoutStartOptions.warmup; render(); }
     else if (action === "toggle-silent") { state.workoutStartOptions.silent = !state.workoutStartOptions.silent; render(); }
     else if (action === "circuit-pause") toggleCircuitPause();

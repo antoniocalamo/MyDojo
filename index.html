@@ -177,6 +177,16 @@
   }
   .error-msg { background: var(--danger-bg); color: var(--danger); }
   .info-msg { background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border); }
+  .flash-msg {
+    background: rgba(22, 163, 74, 0.12);
+    color: var(--ok);
+    border: 1px solid var(--ok);
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
 
   .exercise-row {
     display: flex;
@@ -388,6 +398,16 @@
     font-size: 56px;
     margin-bottom: 10px;
   }
+  .exlib-detail-video {
+    width: 100%;
+    max-height: 320px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    margin-bottom: 10px;
+    display: block;
+    background: #000;
+    object-fit: cover;
+  }
 
   .muscle-list { margin-bottom: 6px; }
   .muscle-row {
@@ -557,6 +577,7 @@
     libraryForm: null,
     weeklyPlan: [],
     profileReturnTab: null,
+    flashMessage: null,
     sessionSets: [],
     history: [],
     historyDetail: null,
@@ -778,6 +799,7 @@
     app.innerHTML =
       (showNav ? renderScreenHeader(tabTitles[state.view]) : "") +
       '<main class="screen">' +
+        (state.flashMessage ? '<div class="flash-msg">✓ ' + escapeHtml(state.flashMessage) + '</div>' : "") +
         (showNav && state.authError ? '<div class="error-msg">' + escapeHtml(state.authError) + '</div>' : "") +
         body +
       '</main>' +
@@ -1141,10 +1163,18 @@
       '</span><span class="muscle-dots">' + dots + '</span></div>';
   }
 
+  function isVideoUrl(url) {
+    return !!url && /\.(mp4|webm|mov)$/i.test(url);
+  }
+
   function renderLibraryDetail() {
     var ex = state.currentLibraryExercise;
     var html = '<button class="back-btn" data-action="back-to-library">←</button>';
-    html += '<div class="exlib-detail-banner">' + equipmentIcon(ex.equipment) + '</div>';
+    if (isVideoUrl(ex.image_url)) {
+      html += '<video class="exlib-detail-video" src="' + escapeHtml(ex.image_url) + '" autoplay muted loop playsinline controls></video>';
+    } else {
+      html += '<div class="exlib-detail-banner">' + equipmentIcon(ex.equipment) + '</div>';
+    }
     html += '<h1 class="page-title" style="margin-top:0;">' + escapeHtml(ex.name) + '</h1>';
     html += '<div class="pill-row" style="margin-bottom:16px;">' +
       '<span class="tag" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border);flex-shrink:0;">' + escapeHtml(ex.equipment) + '</span>' +
@@ -1262,6 +1292,19 @@
     return renderWorkoutFreeform();
   }
 
+  function findExerciseMedia(ex) {
+    if (!ex) return null;
+    var match = null;
+    if (ex.library_exercise_id) {
+      match = state.libraryExercises.filter(function (le) { return le.id === ex.library_exercise_id; })[0];
+    }
+    if (!match) {
+      var name = (ex.name || "").trim().toLowerCase();
+      match = state.libraryExercises.filter(function (le) { return le.name.trim().toLowerCase() === name; })[0];
+    }
+    return match && isVideoUrl(match.image_url) ? match.image_url : null;
+  }
+
   function renderCircuitPlayer() {
     var c = state.circuit;
     var exs = state.sessionExercises;
@@ -1270,6 +1313,7 @@
     var nextEx = exs[c.index + 1];
     var totalForPhase = isRest ? REST_SECONDS : current.duration_seconds;
     var pct = Math.max(0, Math.min(100, Math.round((c.secondsLeft / totalForPhase) * 100)));
+    var videoUrl = !isRest ? findExerciseMedia(current) : null;
 
     var html = '<button class="back-btn" data-action="go-home">←</button>';
     html += '<p class="circuit-progress">Esercizio ' + (c.index + 1) + ' di ' + exs.length + '</p>';
@@ -1277,6 +1321,10 @@
     html += '<h2 class="circuit-exname">' + escapeHtml(isRest ? (nextEx ? "Prossimo: " + nextEx.name : "Ultimo esercizio") : current.name) + '</h2>';
     html += '<div class="circuit-timer-wrap"><div class="circuit-timer" id="circuit-seconds">' + c.secondsLeft + '</div></div>';
     html += '<div class="circuit-bar-track"><div class="circuit-bar-fill" id="circuit-bar-fill" style="width:' + pct + '%;"></div></div>';
+
+    if (videoUrl) {
+      html += '<video class="exlib-detail-video" src="' + escapeHtml(videoUrl) + '" autoplay muted loop playsinline style="max-height:220px;margin-top:18px;margin-bottom:0;"></video>';
+    }
 
     if (!isRest && current.instructions) {
       html += '<div class="card" style="margin-top:20px;">' +
@@ -1546,6 +1594,16 @@
 
   // ---------- actions ----------
 
+  var flashTimer = null;
+  function showFlash(message) {
+    state.flashMessage = message;
+    if (flashTimer) clearTimeout(flashTimer);
+    flashTimer = setTimeout(function () {
+      state.flashMessage = null;
+      render();
+    }, 2200);
+  }
+
   function withBusy(fn) {
     if (state.busy) return;
     state.busy = true;
@@ -1679,13 +1737,15 @@
     withBusy(function () {
       state.authError = "";
       if (state.currentTemplate.id) {
-        return sb.from("workout_templates").update({ name: name, category: category }).eq("id", state.currentTemplate.id)
+        return sb.from("workout_templates").update({ name: name, category: category }).eq("id", state.currentTemplate.id).select().single()
           .then(function (res) {
             if (res.error) throw res.error;
             state.currentTemplate.name = name;
             state.currentTemplate.category = category;
             state.currentCategory = category;
             return loadTemplates();
+          }).then(function () {
+            showFlash("Obiettivo salvato");
           });
       }
       return sb.from("workout_templates").insert({ user_id: state.user.id, name: name, category: category }).select().single()
@@ -1808,7 +1868,7 @@
   function finishSession() {
     withBusy(function () {
       state.authError = "";
-      return sb.from("workout_sessions").update({ finished_at: new Date().toISOString() }).eq("id", state.activeSession.id)
+      return sb.from("workout_sessions").update({ finished_at: new Date().toISOString() }).eq("id", state.activeSession.id).select().single()
         .then(function (res) {
           if (res.error) throw res.error;
           state.activeSession = null;
@@ -1942,7 +2002,7 @@
     withBusy(function () {
       state.authError = "";
       if (state.currentPresetAdmin.id) {
-        return sb.from("preset_templates").update({ name: name, description: description, category: category }).eq("id", state.currentPresetAdmin.id)
+        return sb.from("preset_templates").update({ name: name, description: description, category: category }).eq("id", state.currentPresetAdmin.id).select().single()
           .then(function (res) {
             if (res.error) throw res.error;
             state.currentPresetAdmin.name = name;
@@ -1950,6 +2010,8 @@
             state.currentPresetAdmin.category = category;
             state.currentCategory = category;
             return loadPresets();
+          }).then(function () {
+            showFlash("Obiettivo aggiornato");
           });
       }
       return sb.from("preset_templates").insert({ name: name, description: description, category: category }).select().single()
@@ -1958,6 +2020,8 @@
           state.currentPresetAdmin = res.data;
           state.currentCategory = category;
           return loadPresets();
+        }).then(function () {
+          showFlash("Obiettivo creato — ora aggiungi gli esercizi");
         });
     });
   }
@@ -1972,11 +2036,13 @@
         instructions: instructions || null,
         duration_seconds: duration,
         order_index: orderIndex
-      }).then(function (res) {
+      }).select().single().then(function (res) {
         if (res.error) throw res.error;
         return loadPresetExercises(state.currentPresetAdmin.id).then(function () {
           state.currentPresetAdminExercises = state.currentPresetExercises;
         });
+      }).then(function () {
+        showFlash("Esercizio aggiunto");
       });
     });
   }
@@ -1984,11 +2050,13 @@
   function deletePresetExercise(id) {
     withBusy(function () {
       state.authError = "";
-      return sb.from("preset_template_exercises").delete().eq("id", id).then(function (res) {
+      return sb.from("preset_template_exercises").delete().eq("id", id).select().single().then(function (res) {
         if (res.error) throw res.error;
         return loadPresetExercises(state.currentPresetAdmin.id).then(function () {
           state.currentPresetAdminExercises = state.currentPresetExercises;
         });
+      }).then(function () {
+        showFlash("Esercizio eliminato");
       });
     });
   }
@@ -1997,10 +2065,12 @@
     if (!confirm("Eliminare questo obiettivo dal catalogo comune? Sarà rimosso per tutti gli utenti.")) return;
     withBusy(function () {
       state.authError = "";
-      return sb.from("preset_templates").delete().eq("id", id).then(function (res) {
+      return sb.from("preset_templates").delete().eq("id", id).select().single().then(function (res) {
         if (res.error) throw res.error;
         state.view = "categoryDetail";
         return loadPresets();
+      }).then(function () {
+        showFlash("Obiettivo eliminato dal catalogo");
       });
     });
   }
@@ -2193,6 +2263,8 @@
           state.currentLibraryExercise = res.data;
           state.view = "libraryDetail";
         });
+      }).then(function () {
+        showFlash("Esercizio salvato");
       });
     });
   }
@@ -2201,11 +2273,13 @@
     if (!confirm("Eliminare questo esercizio dalla tua libreria?")) return;
     withBusy(function () {
       state.authError = "";
-      return sb.from("exercises").delete().eq("id", id).then(function (res) {
+      return sb.from("exercises").delete().eq("id", id).select().single().then(function (res) {
         if (res.error) throw res.error;
         return loadLibraryExercises().then(function () {
           state.view = "library";
         });
+      }).then(function () {
+        showFlash("Esercizio eliminato");
       });
     });
   }

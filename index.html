@@ -521,7 +521,6 @@
   var CATEGORIES = [
     { key: "Forza", emoji: "💪" },
     { key: "HIIT, Cardio", emoji: "🔥" },
-    { key: "Yoga, Stretching", emoji: "🧘" },
     { key: "Riscaldamento, Recupero", emoji: "🤸" }
   ];
 
@@ -895,11 +894,11 @@
 
   function renderPlanEdit() {
     var html = '<button class="back-btn" data-action="plan-cancel-edit">←</button>';
-    html += '<h1 class="page-title">Modifica il piano</h1><p class="page-sub">Assegna una scheda a ogni giorno, oppure lascialo come giorno di riposo.</p>';
+    html += '<h1 class="page-title">Modifica il piano</h1><p class="page-sub">Assegna un obiettivo a ogni giorno, oppure lascialo come giorno di riposo.</p>';
     if (state.authError) html += '<div class="error-msg">' + escapeHtml(state.authError) + '</div>';
 
     if (state.templates.length === 0) {
-      html += '<div class="empty">Non hai ancora nessuna scheda da assegnare.<br>Creane una prima nel tab "Corpo".</div>';
+      html += '<div class="empty">Non hai ancora nessun obiettivo da assegnare.<br>Creane uno prima nel tab "Corpo".</div>';
       return html;
     }
 
@@ -909,7 +908,7 @@
       var currentTplId = assignment ? assignment.template_id : "";
       html += '<label>' + name + '</label>';
       html += '<select name="day-' + idx + '">' +
-        '<option value="">Riposo (nessuna scheda)</option>' +
+        '<option value="">Riposo (nessun obiettivo)</option>' +
         state.templates.map(function (t) {
           return '<option value="' + t.id + '" ' + (currentTplId === t.id ? "selected" : "") + '>' + escapeHtml(t.name) + '</option>';
         }).join("") +
@@ -940,7 +939,7 @@
     });
 
     html += '<button class="btn btn-ghost" data-action="open-library" style="margin-top:6px;margin-bottom:10px;">📚 Libreria esercizi</button>';
-    html += '<button class="btn btn-accent" data-action="new-template">+ Nuova scheda</button>';
+    html += '<button class="btn btn-accent" data-action="new-template">+ Nuovo obiettivo</button>';
     return html;
   }
 
@@ -960,19 +959,19 @@
     var catalogItems = state.presets.filter(function (p) { return (p.category || CATEGORIES[0].key) === cat; });
 
     if (myItems.length === 0 && catalogItems.length === 0) {
-      html += '<div class="empty">Nessuna scheda in questa categoria ancora.</div>';
+      html += '<div class="empty">Nessun obiettivo in questa categoria ancora.</div>';
     }
 
     if (myItems.length > 0) {
-      html += '<h3 class="section-title" style="margin-top:6px;">Le tue schede</h3>';
+      html += '<h3 class="section-title" style="margin-top:6px;">I tuoi obiettivi</h3>';
       myItems.forEach(function (t) { html += workoutCard(t.name, "template", t.id); });
     }
     if (catalogItems.length > 0) {
-      html += '<h3 class="section-title">Dal catalogo</h3>';
+      html += '<h3 class="section-title">Obiettivi pronti</h3>';
       catalogItems.forEach(function (p) { html += workoutCard(p.name, "preset", p.id); });
     }
 
-    html += '<button class="btn btn-ghost" data-action="new-template-in-category" data-id="' + escapeHtml(cat) + '" style="margin-top:16px;">+ Nuova scheda in questa categoria</button>';
+    html += '<button class="btn btn-ghost" data-action="new-template-in-category" data-id="' + escapeHtml(cat) + '" style="margin-top:16px;">+ Nuovo obiettivo in questa categoria</button>';
     return html;
   }
 
@@ -995,7 +994,7 @@
       '</div>';
 
       html += '<div class="card" style="margin-top:4px;">' +
-        '<div class="toggle-row"><div><p class="toggle-label">Inizia con il riscaldamento</p><p class="toggle-sub">Aggiunge 3 esercizi di riscaldamento prima della scheda</p></div>' +
+        '<div class="toggle-row"><div><p class="toggle-label">Inizia con il riscaldamento</p><p class="toggle-sub">Aggiunge 3 esercizi di riscaldamento prima di iniziare</p></div>' +
           '<button class="toggle-switch' + (state.workoutStartOptions.warmup ? " on" : "") + '" data-action="toggle-warmup"></button></div>' +
         '<div class="toggle-row"><div><p class="toggle-label">Allenamento silenzioso</p><p class="toggle-sub">Evita i salti nel riscaldamento</p></div>' +
           '<button class="toggle-switch' + (state.workoutStartOptions.silent ? " on" : "") + '" data-action="toggle-silent"></button></div>' +
@@ -1006,7 +1005,7 @@
 
     html += '<h3 class="section-title">Lista di Esercizi</h3>';
     if (exs.length === 0) {
-      html += '<div class="empty">Nessun esercizio ancora in questa scheda.</div>';
+      html += '<div class="empty">Nessun esercizio ancora in questo obiettivo.</div>';
     } else {
       exs.forEach(function (ex, i) {
         html += '<div class="exercise-row">' +
@@ -1017,7 +1016,7 @@
     }
 
     if (w.kind === "template") {
-      html += '<button class="btn btn-ghost" data-action="edit-workout-template" data-id="' + w.data.id + '" style="margin-top:14px;">✏️ Modifica scheda</button>';
+      html += '<button class="btn btn-ghost" data-action="edit-workout-template" data-id="' + w.data.id + '" style="margin-top:14px;">✏️ Personalizza esercizi</button>';
     }
 
     html += '<div style="height:70px;"></div>';
@@ -1038,7 +1037,7 @@
       ? '<button class="back-btn" data-action="open-template" data-id="' + state.currentTemplate.id + '">←</button>'
       : '<button class="back-btn" data-action="go-home">←</button>';
     html += '<h1 class="page-title">Libreria esercizi</h1>';
-    html += '<p class="page-sub">' + (state.libraryPickMode ? "Scegli un esercizio da aggiungere alla scheda" : "Come si fanno e quali muscoli coinvolgono") + '</p>';
+    html += '<p class="page-sub">' + (state.libraryPickMode ? "Scegli un esercizio da aggiungere all'obiettivo" : "Come si fanno e quali muscoli coinvolgono") + '</p>';
 
     html += '<div class="pill-row">' +
       pillButton("Tutti i muscoli", "filter-muscle", "", !state.libraryFilterMuscle) +
@@ -1162,18 +1161,18 @@
   function renderTemplateEditor() {
     var t = state.currentTemplate;
     var html = '<button class="back-btn" data-action="open-category" data-id="' + escapeHtml(state.currentCategory || CATEGORIES[0].key) + '">←</button>';
-    html += '<h1 class="page-title">' + (t.id ? "Modifica scheda" : "Nuova scheda") + '</h1>';
+    html += '<h1 class="page-title">' + (t.id ? "Personalizza obiettivo" : "Nuovo obiettivo") + '</h1>';
 
     if (state.authError) html += '<div class="error-msg">' + escapeHtml(state.authError) + '</div>';
 
     html += '<form data-action="save-template-name">' +
-      '<label>Nome scheda</label>' +
-      '<input type="text" name="name" value="' + escapeHtml(t.name || "") + '" placeholder="Es. Petto/Tricipiti" required>' +
+      '<label>Nome obiettivo</label>' +
+      '<input type="text" name="name" value="' + escapeHtml(t.name || "") + '" placeholder="Es. Glutei brasiliani" required>' +
       '<label>Categoria</label>' +
       '<select name="category">' +
         CATEGORIES.map(function (c) { return '<option value="' + escapeHtml(c.key) + '" ' + ((t.category || CATEGORIES[0].key) === c.key ? "selected" : "") + '>' + escapeHtml(c.key) + '</option>'; }).join("") +
       '</select>' +
-      '<button class="btn btn-accent" type="submit">' + (t.id ? "Salva" : "Crea scheda") + '</button>' +
+      '<button class="btn btn-accent" type="submit">' + (t.id ? "Salva" : "Crea obiettivo") + '</button>' +
     '</form>';
 
     if (t.id) {
@@ -1194,7 +1193,7 @@
         '<button class="btn btn-accent" type="submit">+</button>' +
       '</form>';
 
-      html += '<button class="btn btn-danger" data-action="delete-template" data-id="' + t.id + '" style="margin-top:24px;">Elimina scheda</button>';
+      html += '<button class="btn btn-danger" data-action="delete-template" data-id="' + t.id + '" style="margin-top:24px;">Elimina obiettivo</button>';
     }
 
     return html;
@@ -1247,7 +1246,7 @@
     '</div>';
 
     if (state.sessionExercises.length === 0) {
-      html += '<div class="empty">Questa scheda non ha esercizi.<br>Aggiungili prima di allenarti.</div>';
+      html += '<div class="empty">Questo obiettivo non ha esercizi.<br>Aggiungili prima di allenarti.</div>';
     }
 
     state.sessionExercises.forEach(function (ex) {
@@ -1363,7 +1362,7 @@
     html += '<div class="stats-row">' +
       '<div class="stat-tile"><span class="num">' + state.stats.count + '</span><span class="lbl">Allenamenti</span></div>' +
       '<div class="stat-tile"><span class="num">' + state.stats.hours + '</span><span class="lbl">Ore totali</span></div>' +
-      '<div class="stat-tile"><span class="num">' + state.templates.length + '</span><span class="lbl">Schede</span></div>' +
+      '<div class="stat-tile"><span class="num">' + state.templates.length + '</span><span class="lbl">Obiettivi</span></div>' +
     '</div>';
 
     html += '<h3 class="section-title">Aspetto</h3>';
@@ -1668,7 +1667,7 @@
   }
 
   function deleteTemplate(id) {
-    if (!confirm("Eliminare questa scheda e tutti i suoi esercizi?")) return;
+    if (!confirm("Eliminare questo obiettivo e tutti i suoi esercizi?")) return;
     withBusy(function () {
       state.authError = "";
       return sb.from("workout_templates").delete().eq("id", id).then(function (res) {

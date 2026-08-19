@@ -438,6 +438,45 @@
   .plan-day-info { display: flex; flex-direction: column; gap: 2px; }
   .plan-day-name { font-size: 14px; font-weight: 700; }
   .plan-day-workout { font-size: 13px; color: var(--text-dim); }
+
+  /* dettaglio allenamento (stile Fitify) */
+  .workout-hero {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 40px;
+    text-align: center;
+    font-size: 64px;
+  }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; }
+  .toggle-row + .toggle-row { border-top: 1px solid var(--border); }
+  .toggle-label { font-size: 14px; font-weight: 700; margin: 0; }
+  .toggle-sub { font-size: 12px; color: var(--text-dim); margin: 2px 0 0; }
+  .toggle-switch {
+    width: 46px;
+    height: 26px;
+    border-radius: 999px;
+    background: var(--border);
+    border: none;
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .toggle-switch::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: #fff;
+    transition: transform 0.15s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .toggle-switch.on { background: var(--accent); }
+  .toggle-switch.on::after { transform: translateX(20px); }
 </style>
 </head>
 <body>
@@ -478,6 +517,13 @@
   };
 
   var WEEKDAY_NAMES = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
+
+  var CATEGORIES = [
+    { key: "Forza", emoji: "💪" },
+    { key: "HIIT, Cardio", emoji: "🔥" },
+    { key: "Yoga, Stretching", emoji: "🧘" },
+    { key: "Riscaldamento, Recupero", emoji: "🤸" }
+  ];
 
   var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -520,8 +566,11 @@
     historyDetailSets: [],
     historyDetailExercises: [],
     presets: [],
-    currentPreset: null,
     currentPresetExercises: [],
+    currentCategory: null,
+    currentWorkout: null,
+    currentWorkoutExercises: [],
+    workoutStartOptions: { warmup: false, silent: false },
     circuit: null,
     stats: { count: 0, hours: 0 },
     busy: false
@@ -699,7 +748,7 @@
       return;
     }
 
-    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "presets", "presetDetail", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEdit"];
+    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "categoryDetail", "workoutDetail", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEdit"];
     if (knownViews.indexOf(state.view) === -1) state.view = "plan";
 
     var tabs = ["plan", "home", "benessere", "history"];
@@ -714,8 +763,8 @@
     else if (state.view === "history") body = renderHistory();
     else if (state.view === "historyDetail") body = renderHistoryDetail();
     else if (state.view === "profile") body = renderProfile();
-    else if (state.view === "presets") body = renderPresets();
-    else if (state.view === "presetDetail") body = renderPresetDetail();
+    else if (state.view === "categoryDetail") body = renderCategoryDetail();
+    else if (state.view === "workoutDetail") body = renderWorkoutDetail();
     else if (state.view === "benessere") body = renderBenessere();
     else if (state.view === "library") body = renderLibrary();
     else if (state.view === "libraryDetail") body = renderLibraryDetail();
@@ -872,7 +921,7 @@
   }
 
   function renderHome() {
-    var html = '<p class="page-sub" style="margin-top:2px;">Le tue schede di allenamento</p>';
+    var html = '<p class="page-sub" style="margin-top:2px;">Scegli una categoria</p>';
 
     if (state.activeSession) {
       html += '<div class="hero-card live" style="background:' + gradientFor(state.activeSession.template_id || state.activeSession.id) + ';" data-action="resume-session">' +
@@ -883,67 +932,96 @@
       '</div>';
     }
 
-    if (state.templates.length === 0) {
-      html += '<div class="empty">Non hai ancora nessuna scheda.<br>Creane una per iniziare.</div>';
-    } else {
-      state.templates.forEach(function (t) {
-        html += '<div class="hero-card" style="background:' + gradientFor(t.id) + ';min-height:110px;" data-action="open-template" data-id="' + t.id + '">' +
-          '<span class="hero-icon">💪</span>' +
-          '<p class="hero-title">' + escapeHtml(t.name) + '</p>' +
-          '<p class="hero-meta">Creata il ' + formatDate(t.created_at) + '</p>' +
-        '</div>' +
-        '<div class="btn-row" style="margin-top:-6px;margin-bottom:16px;">' +
-          '<button class="btn btn-cta btn-small" data-action="start-session" data-id="' + t.id + '" ' + (state.activeSession ? "disabled" : "") + '>Inizia allenamento</button>' +
-          '<button class="btn btn-ghost btn-small" data-action="open-template" data-id="' + t.id + '">Modifica</button>' +
-        '</div>';
-      });
-    }
-
-    html += '<button class="btn btn-ghost" data-action="open-library" style="margin-bottom:10px;">📚 Libreria esercizi</button>';
-    html += '<div class="btn-row">' +
-      '<button class="btn btn-ghost" data-action="open-presets">📋 Schede pronte</button>' +
-      '<button class="btn btn-accent" data-action="new-template">+ Nuova</button>' +
-    '</div>';
-    return html;
-  }
-
-  function renderPresets() {
-    var html = '<button class="back-btn" data-action="go-home">←</button>';
-    html += '<h1 class="page-title">Schede pronte</h1><p class="page-sub">Circuiti a tempo, pronti per iniziare</p>';
-
-    if (state.presets.length === 0) {
-      html += '<div class="empty">Nessuna scheda pronta disponibile al momento.</div>';
-    } else {
-      state.presets.forEach(function (p) {
-        html += '<div class="hero-card" style="background:' + gradientFor(p.id) + ';min-height:110px;" data-action="open-preset-detail" data-id="' + p.id + '">' +
-          '<span class="hero-icon">⏱️</span>' +
-          '<p class="hero-title">' + escapeHtml(p.name) + '</p>' +
-          '<p class="hero-meta">' + escapeHtml(p.description || "") + '</p>' +
-        '</div>';
-      });
-    }
-    return html;
-  }
-
-  function renderPresetDetail() {
-    var p = state.currentPreset;
-    var html = '<button class="back-btn" data-action="open-presets">←</button>';
-    html += '<h1 class="page-title">' + escapeHtml(p.name) + '</h1><p class="page-sub">' + escapeHtml(p.description || "") + '</p>';
-
-    var totalSeconds = state.currentPresetExercises.reduce(function (sum, ex) { return sum + ex.duration_seconds + REST_SECONDS; }, 0);
-    html += '<div class="stats-row">' +
-      '<div class="stat-tile"><span class="num">' + state.currentPresetExercises.length + '</span><span class="lbl">Esercizi</span></div>' +
-      '<div class="stat-tile"><span class="num">~' + Math.round(totalSeconds / 60) + '</span><span class="lbl">Minuti</span></div>' +
-    '</div>';
-
-    state.currentPresetExercises.forEach(function (ex, i) {
-      html += '<div class="exercise-row">' +
-        '<span class="name">' + (i + 1) + '. ' + escapeHtml(ex.name) + '</span>' +
-        '<span class="tag" style="background:var(--surface-2);color:var(--text-dim);">' + ex.duration_seconds + 's</span>' +
+    CATEGORIES.forEach(function (cat) {
+      html += '<div class="hero-card" style="background:' + gradientFor(cat.key) + ';min-height:110px;" data-action="open-category" data-id="' + escapeHtml(cat.key) + '">' +
+        '<span class="hero-icon">' + cat.emoji + '</span>' +
+        '<p class="hero-title">' + escapeHtml(cat.key) + '</p>' +
       '</div>';
     });
 
-    html += '<button class="btn btn-accent" data-action="clone-preset" style="margin-top:20px;">Aggiungi alle mie schede</button>';
+    html += '<button class="btn btn-ghost" data-action="open-library" style="margin-top:6px;margin-bottom:10px;">📚 Libreria esercizi</button>';
+    html += '<button class="btn btn-accent" data-action="new-template">+ Nuova scheda</button>';
+    return html;
+  }
+
+  function workoutCard(name, kind, id) {
+    return '<div class="hero-card" style="background:' + gradientFor(id) + ';min-height:90px;" data-action="open-workout" data-kind="' + kind + '" data-id="' + escapeHtml(id) + '">' +
+      '<span class="hero-icon">🏋️</span>' +
+      '<p class="hero-title">' + escapeHtml(name) + '</p>' +
+    '</div>';
+  }
+
+  function renderCategoryDetail() {
+    var cat = state.currentCategory;
+    var html = '<button class="back-btn" data-action="go-home">←</button>';
+    html += '<h1 class="page-title">' + escapeHtml(cat) + '</h1>';
+
+    var myItems = state.templates.filter(function (t) { return (t.category || CATEGORIES[0].key) === cat; });
+    var catalogItems = state.presets.filter(function (p) { return (p.category || CATEGORIES[0].key) === cat; });
+
+    if (myItems.length === 0 && catalogItems.length === 0) {
+      html += '<div class="empty">Nessuna scheda in questa categoria ancora.</div>';
+    }
+
+    if (myItems.length > 0) {
+      html += '<h3 class="section-title" style="margin-top:6px;">Le tue schede</h3>';
+      myItems.forEach(function (t) { html += workoutCard(t.name, "template", t.id); });
+    }
+    if (catalogItems.length > 0) {
+      html += '<h3 class="section-title">Dal catalogo</h3>';
+      catalogItems.forEach(function (p) { html += workoutCard(p.name, "preset", p.id); });
+    }
+
+    html += '<button class="btn btn-ghost" data-action="new-template-in-category" data-id="' + escapeHtml(cat) + '" style="margin-top:16px;">+ Nuova scheda in questa categoria</button>';
+    return html;
+  }
+
+  function renderWorkoutDetail() {
+    var w = state.currentWorkout;
+    var exs = state.currentWorkoutExercises;
+    var isPreset = w.kind === "preset";
+    var isCircuit = exs.length > 0 && exs.every(function (ex) { return ex.duration_seconds != null; });
+    var html = '<button class="back-btn" data-action="open-category" data-id="' + escapeHtml(state.currentCategory) + '">←</button>';
+
+    html += '<div class="workout-hero">🏋️</div>';
+    html += '<h1 class="page-title" style="margin-top:10px;">' + escapeHtml(w.data.name) + '</h1>';
+    if (isPreset && w.data.description) html += '<p class="page-sub">' + escapeHtml(w.data.description) + '</p>';
+
+    if (isCircuit) {
+      var totalSeconds = exs.reduce(function (sum, ex) { return sum + ex.duration_seconds + REST_SECONDS; }, 0);
+      html += '<div class="stats-row">' +
+        '<div class="stat-tile"><span class="num">' + exs.length + '</span><span class="lbl">Esercizi</span></div>' +
+        '<div class="stat-tile"><span class="num">~' + Math.round(totalSeconds / 60) + '</span><span class="lbl">Minuti</span></div>' +
+      '</div>';
+
+      html += '<div class="card" style="margin-top:4px;">' +
+        '<div class="toggle-row"><div><p class="toggle-label">Inizia con il riscaldamento</p><p class="toggle-sub">Aggiunge 3 esercizi di riscaldamento prima della scheda</p></div>' +
+          '<button class="toggle-switch' + (state.workoutStartOptions.warmup ? " on" : "") + '" data-action="toggle-warmup"></button></div>' +
+        '<div class="toggle-row"><div><p class="toggle-label">Allenamento silenzioso</p><p class="toggle-sub">Evita i salti nel riscaldamento</p></div>' +
+          '<button class="toggle-switch' + (state.workoutStartOptions.silent ? " on" : "") + '" data-action="toggle-silent"></button></div>' +
+      '</div>';
+    } else {
+      html += '<div class="stats-row"><div class="stat-tile"><span class="num">' + exs.length + '</span><span class="lbl">Esercizi</span></div></div>';
+    }
+
+    html += '<h3 class="section-title">Lista di Esercizi</h3>';
+    if (exs.length === 0) {
+      html += '<div class="empty">Nessun esercizio ancora in questa scheda.</div>';
+    } else {
+      exs.forEach(function (ex, i) {
+        html += '<div class="exercise-row">' +
+          '<span class="name">' + (i + 1) + '. ' + escapeHtml(ex.name) + '</span>' +
+          (ex.duration_seconds ? '<span class="tag" style="background:var(--surface-2);color:var(--text-dim);">' + ex.duration_seconds + 's</span>' : '') +
+        '</div>';
+      });
+    }
+
+    if (w.kind === "template") {
+      html += '<button class="btn btn-ghost" data-action="edit-workout-template" data-id="' + w.data.id + '" style="margin-top:14px;">✏️ Modifica scheda</button>';
+    }
+
+    html += '<div style="height:70px;"></div>';
+    html += '<div class="fixed-cta"><button class="btn btn-cta" data-action="start-workout" ' + ((state.activeSession || exs.length === 0) ? "disabled" : "") + '>Inizio</button></div>';
     return html;
   }
 
@@ -1083,7 +1161,7 @@
 
   function renderTemplateEditor() {
     var t = state.currentTemplate;
-    var html = '<button class="back-btn" data-action="go-home">←</button>';
+    var html = '<button class="back-btn" data-action="open-category" data-id="' + escapeHtml(state.currentCategory || CATEGORIES[0].key) + '">←</button>';
     html += '<h1 class="page-title">' + (t.id ? "Modifica scheda" : "Nuova scheda") + '</h1>';
 
     if (state.authError) html += '<div class="error-msg">' + escapeHtml(state.authError) + '</div>';
@@ -1091,7 +1169,11 @@
     html += '<form data-action="save-template-name">' +
       '<label>Nome scheda</label>' +
       '<input type="text" name="name" value="' + escapeHtml(t.name || "") + '" placeholder="Es. Petto/Tricipiti" required>' +
-      '<button class="btn btn-accent" type="submit">' + (t.id ? "Salva nome" : "Crea scheda") + '</button>' +
+      '<label>Categoria</label>' +
+      '<select name="category">' +
+        CATEGORIES.map(function (c) { return '<option value="' + escapeHtml(c.key) + '" ' + ((t.category || CATEGORIES[0].key) === c.key ? "selected" : "") + '>' + escapeHtml(c.key) + '</option>'; }).join("") +
+      '</select>' +
+      '<button class="btn btn-accent" type="submit">' + (t.id ? "Salva" : "Crea scheda") + '</button>' +
     '</form>';
 
     if (t.id) {
@@ -1433,7 +1515,7 @@
 
   function loadHomeData() {
     state.authError = "";
-    return Promise.all([loadTemplates(), loadActiveSession(), loadHistory()]).then(function () {
+    return Promise.all([loadTemplates(), loadActiveSession(), loadHistory(), loadPresets()]).then(function () {
       state.view = "home";
     });
   }
@@ -1512,6 +1594,7 @@
       state.authError = "";
       var t = state.templates.filter(function (x) { return x.id === id; })[0];
       state.currentTemplate = t;
+      state.currentCategory = t.category || CATEGORIES[0].key;
       state.view = "template";
       return loadTemplateExercises(id);
     });
@@ -1519,26 +1602,40 @@
 
   function newTemplate() {
     state.authError = "";
-    state.currentTemplate = { id: null, name: "" };
+    state.currentCategory = CATEGORIES[0].key;
+    state.currentTemplate = { id: null, name: "", category: state.currentCategory };
     state.currentTemplateExercises = [];
     state.view = "template";
     render();
   }
 
-  function saveTemplateName(name) {
+  function newTemplateInCategory(category) {
+    state.authError = "";
+    state.currentCategory = category;
+    state.currentTemplate = { id: null, name: "", category: category };
+    state.currentTemplateExercises = [];
+    state.view = "template";
+    render();
+  }
+
+  function saveTemplateName(name, category) {
     withBusy(function () {
       state.authError = "";
       if (state.currentTemplate.id) {
-        return sb.from("workout_templates").update({ name: name }).eq("id", state.currentTemplate.id)
+        return sb.from("workout_templates").update({ name: name, category: category }).eq("id", state.currentTemplate.id)
           .then(function (res) {
             if (res.error) throw res.error;
             state.currentTemplate.name = name;
+            state.currentTemplate.category = category;
+            state.currentCategory = category;
+            return loadTemplates();
           });
       }
-      return sb.from("workout_templates").insert({ user_id: state.user.id, name: name }).select().single()
+      return sb.from("workout_templates").insert({ user_id: state.user.id, name: name, category: category }).select().single()
         .then(function (res) {
           if (res.error) throw res.error;
           state.currentTemplate = res.data;
+          state.currentCategory = category;
           return loadTemplateExercises(res.data.id);
         }).then(loadTemplates);
     });
@@ -1576,7 +1673,7 @@
       state.authError = "";
       return sb.from("workout_templates").delete().eq("id", id).then(function (res) {
         if (res.error) throw res.error;
-        state.view = "home";
+        state.view = "categoryDetail";
         return loadTemplates();
       });
     });
@@ -1604,6 +1701,10 @@
   function resumeSession() {
     withBusy(function () {
       state.authError = "";
+      if (state.circuit && state.sessionExercises.length > 0) {
+        state.view = "workout";
+        return;
+      }
       return loadSessionData(state.activeSession.id, state.activeSession.template_id).then(function () {
         initCircuitIfNeeded();
         state.view = "workout";
@@ -1716,46 +1817,98 @@
     render();
   }
 
-  function openPresets() {
-    withBusy(function () {
-      state.authError = "";
-      return loadPresets().then(function () { state.view = "presets"; });
-    });
+  function openCategory(key) {
+    state.authError = "";
+    state.currentCategory = key;
+    state.view = "categoryDetail";
+    render();
   }
 
-  function openPresetDetail(id) {
+  function openWorkout(kind, id) {
     withBusy(function () {
       state.authError = "";
+      state.workoutStartOptions = { warmup: false, silent: false };
+      if (kind === "template") {
+        var t = state.templates.filter(function (x) { return x.id === id; })[0];
+        state.currentWorkout = { kind: "template", data: t };
+        state.view = "workoutDetail";
+        return loadTemplateExercises(id).then(function () {
+          state.currentWorkoutExercises = state.currentTemplateExercises;
+        });
+      }
       var p = state.presets.filter(function (x) { return x.id === id; })[0];
-      state.currentPreset = p;
-      state.view = "presetDetail";
-      return loadPresetExercises(id);
+      state.currentWorkout = { kind: "preset", data: p };
+      state.view = "workoutDetail";
+      return loadPresetExercises(id).then(function () {
+        state.currentWorkoutExercises = state.currentPresetExercises;
+      });
     });
   }
 
-  function clonePreset() {
+  var GENERIC_WARMUP = {
+    normal: [
+      { name: "Jumping Jacks", duration_seconds: 30, instructions: "Salta divaricando le gambe e alzando le braccia sopra la testa, poi torna alla posizione di partenza, a ritmo costante." },
+      { name: "Mobilità spalle", duration_seconds: 30, instructions: "Ruota lentamente le spalle avanti e indietro, poi apri e chiudi le braccia, per sciogliere la parte alta del corpo." },
+      { name: "Squat a corpo libero", duration_seconds: 30, instructions: "Piedi alla larghezza delle spalle, scendi piegando le ginocchia come per sederti su una sedia, poi risali, a ritmo lento." }
+    ],
+    silent: [
+      { name: "Marcia sul posto", duration_seconds: 30, instructions: "Cammina sul posto sollevando bene le ginocchia, braccia in movimento, per attivare la circolazione senza saltare." },
+      { name: "Mobilità spalle", duration_seconds: 30, instructions: "Ruota lentamente le spalle avanti e indietro, poi apri e chiudi le braccia, per sciogliere la parte alta del corpo." },
+      { name: "Squat a corpo libero", duration_seconds: 30, instructions: "Piedi alla larghezza delle spalle, scendi piegando le ginocchia come per sederti su una sedia, poi risali, a ritmo lento." }
+    ]
+  };
+
+  function applyStartOptions(exercises) {
+    if (!state.workoutStartOptions.warmup) return exercises;
+    var warmupMoves = state.workoutStartOptions.silent ? GENERIC_WARMUP.silent : GENERIC_WARMUP.normal;
+    return warmupMoves.map(function (m, i) {
+      return { id: "warmup-" + i, name: m.name, duration_seconds: m.duration_seconds, instructions: m.instructions };
+    }).concat(exercises);
+  }
+
+  function beginSession(templateId, templateName, exercisesForSession) {
+    return sb.from("workout_sessions").insert({
+      user_id: state.user.id,
+      template_id: templateId,
+      template_name: templateName
+    }).select().single().then(function (res) {
+      if (res.error) throw res.error;
+      state.activeSession = res.data;
+      state.sessionExercises = applyStartOptions(exercisesForSession);
+      state.sessionSets = [];
+      initCircuitIfNeeded();
+      state.view = "workout";
+    });
+  }
+
+  function startWorkout() {
     withBusy(function () {
       state.authError = "";
-      var preset = state.currentPreset;
-      return sb.from("workout_templates").insert({ user_id: state.user.id, name: preset.name }).select().single()
+      var w = state.currentWorkout;
+      if (w.kind === "template") {
+        return beginSession(w.data.id, w.data.name, state.currentWorkoutExercises);
+      }
+      var preset = w.data;
+      return sb.from("workout_templates").insert({ user_id: state.user.id, name: preset.name, category: state.currentCategory }).select().single()
         .then(function (res) {
           if (res.error) throw res.error;
-          var rows = state.currentPresetExercises.map(function (ex, i) {
+          var newTplId = res.data.id;
+          var rows = state.currentWorkoutExercises.map(function (ex, i) {
             return {
               user_id: state.user.id,
-              template_id: res.data.id,
+              template_id: newTplId,
               name: ex.name,
               instructions: ex.instructions,
               duration_seconds: ex.duration_seconds,
               order_index: i
             };
           });
-          return sb.from("template_exercises").insert(rows);
-        }).then(function (res) {
-          if (res && res.error) throw res.error;
-          return loadTemplates();
-        }).then(function () {
-          state.view = "home";
+          return sb.from("template_exercises").insert(rows).select().then(function (res2) {
+            if (res2.error) throw res2.error;
+            return loadTemplates().then(function () {
+              return beginSession(newTplId, preset.name, res2.data);
+            });
+          });
         });
     });
   }
@@ -1885,7 +2038,7 @@
     e.preventDefault();
     var action = form.getAttribute("data-action");
     if (action === "submit-auth") handleSubmitAuth(form);
-    else if (action === "save-template-name") saveTemplateName(form.name.value.trim());
+    else if (action === "save-template-name") saveTemplateName(form.name.value.trim(), form.category.value);
     else if (action === "add-exercise") {
       var name = form.exname.value.trim();
       if (name) { addExercise(name); form.reset(); }
@@ -1920,6 +2073,7 @@
     }
     else if (action === "go-home") goHome();
     else if (action === "new-template") newTemplate();
+    else if (action === "new-template-in-category") newTemplateInCategory(el.getAttribute("data-id"));
     else if (action === "open-template") openTemplate(id);
     else if (action === "delete-exercise") deleteExercise(id);
     else if (action === "delete-template") deleteTemplate(id);
@@ -1929,9 +2083,12 @@
     else if (action === "open-history") openHistory();
     else if (action === "open-history-detail") openHistoryDetail(id);
     else if (action === "set-theme") setTheme(el.getAttribute("data-theme"));
-    else if (action === "open-presets") openPresets();
-    else if (action === "open-preset-detail") openPresetDetail(id);
-    else if (action === "clone-preset") clonePreset();
+    else if (action === "open-category") openCategory(el.getAttribute("data-id"));
+    else if (action === "open-workout") openWorkout(el.getAttribute("data-kind"), id);
+    else if (action === "edit-workout-template") openTemplate(id);
+    else if (action === "start-workout") startWorkout();
+    else if (action === "toggle-warmup") { state.workoutStartOptions.warmup = !state.workoutStartOptions.warmup; render(); }
+    else if (action === "toggle-silent") { state.workoutStartOptions.silent = !state.workoutStartOptions.silent; render(); }
     else if (action === "circuit-pause") toggleCircuitPause();
     else if (action === "circuit-skip") skipCircuitPhase();
     else if (action === "open-library") openLibrary(false);

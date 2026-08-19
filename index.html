@@ -1514,7 +1514,7 @@
 
   function loadHomeData() {
     state.authError = "";
-    return Promise.all([loadTemplates(), loadActiveSession(), loadHistory(), loadPresets()]).then(function () {
+    return Promise.all([loadTemplates(), loadActiveSession(), loadHistory(), loadPresets(), loadLibraryExercises()]).then(function () {
       state.view = "home";
     });
   }
@@ -1635,7 +1635,23 @@
           if (res.error) throw res.error;
           state.currentTemplate = res.data;
           state.currentCategory = category;
-          return loadTemplateExercises(res.data.id);
+          var suggested = suggestExercisesForGoal(name, category);
+          if (suggested.length === 0) return loadTemplateExercises(res.data.id);
+          var rows = suggested.map(function (ex, i) {
+            return {
+              user_id: state.user.id,
+              template_id: res.data.id,
+              name: ex.name,
+              instructions: ex.instructions,
+              duration_seconds: ex.duration_seconds,
+              library_exercise_id: ex.library_exercise_id,
+              order_index: i
+            };
+          });
+          return sb.from("template_exercises").insert(rows).then(function (res2) {
+            if (res2.error) throw res2.error;
+            return loadTemplateExercises(res.data.id);
+          });
         }).then(loadTemplates);
     });
   }
@@ -1856,6 +1872,55 @@
       { name: "Squat a corpo libero", duration_seconds: 30, instructions: "Piedi alla larghezza delle spalle, scendi piegando le ginocchia come per sederti su una sedia, poi risali, a ritmo lento." }
     ]
   };
+
+  var GOAL_KEYWORDS = [
+    { match: ["glute"], muscle: "Glutei" },
+    { match: ["addomin", "tartarug", "core", "pancia"], muscle: "Addominali" },
+    { match: ["dors", "schiena"], muscle: "Schiena" },
+    { match: ["pett"], muscle: "Petto" },
+    { match: ["bicip", "bracc"], muscle: "Bicipiti" },
+    { match: ["tricip"], muscle: "Tricipiti" },
+    { match: ["gamb", "quadricip"], muscle: "Quadricipiti" },
+    { match: ["femoral"], muscle: "Femorali" },
+    { match: ["polpacc"], muscle: "Polpacci" },
+    { match: ["spall"], muscle: "Spalle" },
+    { match: ["avambracc"], muscle: "Avambracci" }
+  ];
+
+  function suggestExercisesForGoal(name, category) {
+    var lower = name.toLowerCase();
+    var matched = GOAL_KEYWORDS.filter(function (k) {
+      return k.match.some(function (kw) { return lower.indexOf(kw) !== -1; });
+    })[0];
+    var isCircuitCat = category === "HIIT, Cardio" || category === "Riscaldamento, Recupero";
+
+    if (!matched && category === "Riscaldamento, Recupero") {
+      return GENERIC_WARMUP.normal.map(function (m) {
+        return { name: m.name, instructions: m.instructions, duration_seconds: m.duration_seconds, library_exercise_id: null };
+      });
+    }
+
+    var pool;
+    if (matched) {
+      pool = state.libraryExercises.filter(function (ex) { return ex.muscle_primary === matched.muscle; });
+      if (pool.length < 3) {
+        state.libraryExercises.forEach(function (ex) {
+          if (pool.indexOf(ex) === -1 && (ex.muscles_secondary || []).indexOf(matched.muscle) !== -1) pool.push(ex);
+        });
+      }
+    } else {
+      var fallbackNames = category === "HIIT, Cardio"
+        ? ["Burpees", "Kettlebell swing", "Squat a corpo libero", "Affondi con manubri"]
+        : ["Squat a corpo libero", "Push-up (Piegamenti sul petto)", "Plank", "Rematore con elastico"];
+      pool = fallbackNames.map(function (n) {
+        return state.libraryExercises.filter(function (ex) { return ex.name === n; })[0];
+      }).filter(function (ex) { return !!ex; });
+    }
+
+    return pool.slice(0, 5).map(function (ex) {
+      return { name: ex.name, instructions: null, duration_seconds: isCircuitCat ? 30 : null, library_exercise_id: ex.id };
+    });
+  }
 
   function applyStartOptions(exercises) {
     if (!state.workoutStartOptions.warmup) return exercises;

@@ -635,6 +635,7 @@
     currentWorkoutExercises: [],
     currentPresetAdmin: null,
     currentPresetAdminExercises: [],
+    favoriteIds: [],
     workoutStartOptions: { warmup: false, silent: false },
     circuit: null,
     stats: { count: 0, hours: 0 },
@@ -1048,6 +1049,12 @@
       '</div>';
     }
 
+    var favPresets = state.presets.filter(function (p) { return state.favoriteIds.indexOf(p.id) !== -1; });
+    if (favPresets.length > 0) {
+      html += '<h3 class="section-title" style="margin-top:0;">❤️ I tuoi preferiti</h3>';
+      favPresets.forEach(function (p) { html += workoutCard(p.name, "preset", p.id, true); });
+    }
+
     CATEGORIES.forEach(function (cat) {
       html += '<div class="hero-card" style="background:' + gradientFor(cat.key) + ';min-height:110px;" data-action="open-category" data-id="' + escapeHtml(cat.key) + '">' +
         '<span class="hero-icon">' + cat.emoji + '</span>' +
@@ -1055,13 +1062,13 @@
       '</div>';
     });
 
-    html += '<button class="btn btn-ghost" data-action="open-library" style="margin-top:6px;margin-bottom:10px;">📚 Libreria esercizi</button>';
-    html += '<button class="btn btn-accent" data-action="new-template">+ Nuovo obiettivo</button>';
+    html += '<button class="btn btn-ghost" data-action="open-library" style="margin-top:6px;">📚 Libreria esercizi</button>';
     return html;
   }
 
-  function workoutCard(name, kind, id) {
+  function workoutCard(name, kind, id, isFav) {
     return '<div class="hero-card" style="background:' + gradientFor(id) + ';min-height:90px;" data-action="open-workout" data-kind="' + kind + '" data-id="' + escapeHtml(id) + '">' +
+      (isFav ? '<span class="tag exlib-badge">❤️</span>' : '') +
       '<span class="hero-icon">🏋️</span>' +
       '<p class="hero-title">' + escapeHtml(name) + '</p>' +
     '</div>';
@@ -1079,18 +1086,17 @@
       html += '<div class="empty">Nessun obiettivo in questa categoria ancora.</div>';
     }
 
+    if (catalogItems.length > 0) {
+      html += '<h3 class="section-title" style="margin-top:6px;">Obiettivi pronti</h3>';
+      catalogItems.forEach(function (p) { html += workoutCard(p.name, "preset", p.id, state.favoriteIds.indexOf(p.id) !== -1); });
+    }
     if (myItems.length > 0) {
-      html += '<h3 class="section-title" style="margin-top:6px;">I tuoi obiettivi</h3>';
+      html += '<h3 class="section-title">I tuoi obiettivi personalizzati</h3>';
       myItems.forEach(function (t) { html += workoutCard(t.name, "template", t.id); });
     }
-    if (catalogItems.length > 0) {
-      html += '<h3 class="section-title">Obiettivi pronti</h3>';
-      catalogItems.forEach(function (p) { html += workoutCard(p.name, "preset", p.id); });
-    }
 
-    html += '<button class="btn btn-ghost" data-action="new-template-in-category" data-id="' + escapeHtml(cat) + '" style="margin-top:16px;">+ Nuovo obiettivo in questa categoria</button>';
     if (isAdmin()) {
-      html += '<button class="btn btn-ghost" data-action="open-preset-admin" data-id="" style="margin-top:8px;">🛠️ Nuovo obiettivo nel catalogo (admin)</button>';
+      html += '<button class="btn btn-ghost" data-action="open-preset-admin" data-id="" style="margin-top:16px;">🛠️ Nuovo obiettivo nel catalogo (admin)</button>';
     }
     return html;
   }
@@ -1103,7 +1109,15 @@
     var html = '<button class="back-btn" data-action="open-category" data-id="' + escapeHtml(state.currentCategory) + '">←</button>';
 
     html += '<div class="workout-hero">🏋️</div>';
-    html += '<h1 class="page-title" style="margin-top:10px;">' + escapeHtml(w.data.name) + '</h1>';
+    if (isPreset) {
+      var isFav = state.favoriteIds.indexOf(w.data.id) !== -1;
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;">' +
+        '<h1 class="page-title" style="margin:0;">' + escapeHtml(w.data.name) + '</h1>' +
+        '<button class="btn btn-ghost btn-small" data-action="toggle-favorite" data-id="' + w.data.id + '" style="flex-shrink:0;">' + (isFav ? "❤️" : "🤍") + '</button>' +
+      '</div>';
+    } else {
+      html += '<h1 class="page-title" style="margin-top:10px;">' + escapeHtml(w.data.name) + '</h1>';
+    }
     if (isPreset && w.data.description) html += '<p class="page-sub">' + escapeHtml(w.data.description) + '</p>';
 
     if (isCircuit) {
@@ -1137,8 +1151,11 @@
 
     if (w.kind === "template") {
       html += '<button class="btn btn-ghost" data-action="edit-workout-template" data-id="' + w.data.id + '" style="margin-top:14px;">✏️ Personalizza esercizi</button>';
-    } else if (isAdmin()) {
-      html += '<button class="btn btn-ghost" data-action="open-preset-admin" data-id="' + w.data.id + '" style="margin-top:14px;">🛠️ Modifica nel catalogo (admin)</button>';
+    } else {
+      html += '<button class="btn btn-ghost" data-action="personalize-workout" style="margin-top:14px;">✏️ Personalizza</button>';
+      if (isAdmin()) {
+        html += '<button class="btn btn-ghost" data-action="open-preset-admin" data-id="' + w.data.id + '" style="margin-top:8px;">🛠️ Modifica nel catalogo (admin)</button>';
+      }
     }
 
     html += '<div style="height:70px;"></div>';
@@ -1344,40 +1361,38 @@
   function renderTemplateEditor() {
     var t = state.currentTemplate;
     var html = '<button class="back-btn" data-action="open-category" data-id="' + escapeHtml(state.currentCategory || CATEGORIES[0].key) + '">←</button>';
-    html += '<h1 class="page-title">' + (t.id ? "Personalizza obiettivo" : "Nuovo obiettivo") + '</h1>';
+    html += '<h1 class="page-title">Personalizza obiettivo</h1>';
 
     if (state.authError) html += '<div class="error-msg">' + escapeHtml(state.authError) + '</div>';
 
     html += '<form data-action="save-template-name">' +
       '<label>Nome obiettivo</label>' +
-      '<input type="text" name="name" value="' + escapeHtml(t.name || "") + '" placeholder="Es. Glutei brasiliani" required>' +
+      '<input type="text" name="name" value="' + escapeHtml(t.name || "") + '" required>' +
       '<label>Categoria</label>' +
       '<select name="category">' +
         CATEGORIES.map(function (c) { return '<option value="' + escapeHtml(c.key) + '" ' + ((t.category || CATEGORIES[0].key) === c.key ? "selected" : "") + '>' + escapeHtml(c.key) + '</option>'; }).join("") +
       '</select>' +
-      '<button class="btn btn-accent" type="submit">' + (t.id ? "Salva" : "Crea obiettivo") + '</button>' +
+      '<button class="btn btn-accent" type="submit">Salva</button>' +
     '</form>';
 
-    if (t.id) {
-      html += '<h3 class="section-title">Esercizi</h3>';
-      if (state.currentTemplateExercises.length === 0) {
-        html += '<p class="page-sub" style="margin:0 0 8px;">Nessun esercizio ancora aggiunto.</p>';
-      } else {
-        state.currentTemplateExercises.forEach(function (ex) {
-          html += '<div class="exercise-row">' +
-            '<span class="name">' + (ex.library_exercise_id ? "📚 " : "") + escapeHtml(ex.name) + '</span>' +
-            '<button data-action="delete-exercise" data-id="' + ex.id + '">&times;</button>' +
-          '</div>';
-        });
-      }
-      html += '<button class="btn btn-ghost btn-small" data-action="open-library-pick" style="margin-top:4px;">📚 Scegli dalla libreria</button>';
-      html += '<form class="inline-add" data-action="add-exercise">' +
-        '<input type="text" name="exname" placeholder="Oppure scrivi un nome libero" required>' +
-        '<button class="btn btn-accent" type="submit">+</button>' +
-      '</form>';
-
-      html += '<button class="btn btn-danger" data-action="delete-template" data-id="' + t.id + '" style="margin-top:24px;">Elimina obiettivo</button>';
+    html += '<h3 class="section-title">Esercizi</h3>';
+    if (state.currentTemplateExercises.length === 0) {
+      html += '<p class="page-sub" style="margin:0 0 8px;">Nessun esercizio ancora aggiunto.</p>';
+    } else {
+      state.currentTemplateExercises.forEach(function (ex) {
+        html += '<div class="exercise-row">' +
+          '<span class="name">' + (ex.library_exercise_id ? "📚 " : "") + escapeHtml(ex.name) + '</span>' +
+          '<button data-action="delete-exercise" data-id="' + ex.id + '">&times;</button>' +
+        '</div>';
+      });
     }
+    html += '<button class="btn btn-ghost btn-small" data-action="open-library-pick" style="margin-top:4px;">📚 Scegli dalla libreria</button>';
+    html += '<form class="inline-add" data-action="add-exercise">' +
+      '<input type="text" name="exname" placeholder="Oppure scrivi un nome libero" required>' +
+      '<button class="btn btn-accent" type="submit">+</button>' +
+    '</form>';
+
+    html += '<button class="btn btn-danger" data-action="delete-template" data-id="' + t.id + '" style="margin-top:24px;">Elimina obiettivo</button>';
 
     return html;
   }
@@ -1735,9 +1750,16 @@
     });
   }
 
+  function loadFavorites() {
+    return sb.from("favorites").select("*").then(function (res) {
+      if (res.error) throw res.error;
+      state.favoriteIds = res.data.map(function (f) { return f.preset_template_id; });
+    });
+  }
+
   function loadHomeData() {
     state.authError = "";
-    return Promise.all([loadTemplates(), loadActiveSession(), loadHistory(), loadPresets(), loadLibraryExercises()]).then(function () {
+    return Promise.all([loadTemplates(), loadActiveSession(), loadHistory(), loadPresets(), loadLibraryExercises(), loadFavorites()]).then(function () {
       state.view = "home";
     });
   }
@@ -1822,62 +1844,19 @@
     });
   }
 
-  function newTemplate() {
-    state.authError = "";
-    state.currentCategory = CATEGORIES[0].key;
-    state.currentTemplate = { id: null, name: "", category: state.currentCategory };
-    state.currentTemplateExercises = [];
-    state.view = "template";
-    render();
-  }
-
-  function newTemplateInCategory(category) {
-    state.authError = "";
-    state.currentCategory = category;
-    state.currentTemplate = { id: null, name: "", category: category };
-    state.currentTemplateExercises = [];
-    state.view = "template";
-    render();
-  }
-
   function saveTemplateName(name, category) {
     withBusy(function () {
       state.authError = "";
-      if (state.currentTemplate.id) {
-        return sb.from("workout_templates").update({ name: name, category: category }).eq("id", state.currentTemplate.id).select().single()
-          .then(function (res) {
-            if (res.error) throw res.error;
-            state.currentTemplate.name = name;
-            state.currentTemplate.category = category;
-            state.currentCategory = category;
-            return loadTemplates();
-          }).then(function () {
-            showFlash("Obiettivo salvato");
-          });
-      }
-      return sb.from("workout_templates").insert({ user_id: state.user.id, name: name, category: category }).select().single()
+      return sb.from("workout_templates").update({ name: name, category: category }).eq("id", state.currentTemplate.id).select().single()
         .then(function (res) {
           if (res.error) throw res.error;
-          state.currentTemplate = res.data;
+          state.currentTemplate.name = name;
+          state.currentTemplate.category = category;
           state.currentCategory = category;
-          var suggested = suggestExercisesForGoal(name, category);
-          if (suggested.length === 0) return loadTemplateExercises(res.data.id);
-          var rows = suggested.map(function (ex, i) {
-            return {
-              user_id: state.user.id,
-              template_id: res.data.id,
-              name: ex.name,
-              instructions: ex.instructions,
-              duration_seconds: ex.duration_seconds,
-              library_exercise_id: ex.library_exercise_id,
-              order_index: i
-            };
-          });
-          return sb.from("template_exercises").insert(rows).then(function (res2) {
-            if (res2.error) throw res2.error;
-            return loadTemplateExercises(res.data.id);
-          });
-        }).then(loadTemplates);
+          return loadTemplates();
+        }).then(function () {
+          showFlash("Obiettivo salvato");
+        });
     });
   }
 
@@ -2195,55 +2174,6 @@
     ]
   };
 
-  var GOAL_KEYWORDS = [
-    { match: ["glute"], muscle: "Glutei" },
-    { match: ["addomin", "tartarug", "core", "pancia"], muscle: "Addominali" },
-    { match: ["dors", "schiena"], muscle: "Schiena" },
-    { match: ["pett"], muscle: "Petto" },
-    { match: ["bicip", "bracc"], muscle: "Bicipiti" },
-    { match: ["tricip"], muscle: "Tricipiti" },
-    { match: ["gamb", "quadricip"], muscle: "Quadricipiti" },
-    { match: ["femoral"], muscle: "Femorali" },
-    { match: ["polpacc"], muscle: "Polpacci" },
-    { match: ["spall"], muscle: "Spalle" },
-    { match: ["avambracc"], muscle: "Avambracci" }
-  ];
-
-  function suggestExercisesForGoal(name, category) {
-    var lower = name.toLowerCase();
-    var matched = GOAL_KEYWORDS.filter(function (k) {
-      return k.match.some(function (kw) { return lower.indexOf(kw) !== -1; });
-    })[0];
-    var isCircuitCat = category === "HIIT, Cardio" || category === "Riscaldamento, Recupero";
-
-    if (!matched && category === "Riscaldamento, Recupero") {
-      return GENERIC_WARMUP.normal.map(function (m) {
-        return { name: m.name, instructions: m.instructions, duration_seconds: m.duration_seconds, library_exercise_id: null };
-      });
-    }
-
-    var pool;
-    if (matched) {
-      pool = state.libraryExercises.filter(function (ex) { return ex.muscle_primary === matched.muscle; });
-      if (pool.length < 3) {
-        state.libraryExercises.forEach(function (ex) {
-          if (pool.indexOf(ex) === -1 && (ex.muscles_secondary || []).indexOf(matched.muscle) !== -1) pool.push(ex);
-        });
-      }
-    } else {
-      var fallbackNames = category === "HIIT, Cardio"
-        ? ["Burpees", "Kettlebell swing", "Squat a corpo libero", "Affondi con manubri"]
-        : ["Squat a corpo libero", "Push-up (Piegamenti sul petto)", "Plank", "Rematore con elastico"];
-      pool = fallbackNames.map(function (n) {
-        return state.libraryExercises.filter(function (ex) { return ex.name === n; })[0];
-      }).filter(function (ex) { return !!ex; });
-    }
-
-    return pool.slice(0, 5).map(function (ex) {
-      return { name: ex.name, instructions: null, duration_seconds: isCircuitCat ? 30 : null, library_exercise_id: ex.id };
-    });
-  }
-
   function applyStartOptions(exercises) {
     if (!state.workoutStartOptions.warmup) return exercises;
     var warmupMoves = state.workoutStartOptions.silent ? GENERIC_WARMUP.silent : GENERIC_WARMUP.normal;
@@ -2267,6 +2197,30 @@
     });
   }
 
+  function clonePresetToPersonal(preset, exercises, category) {
+    return sb.from("workout_templates").insert({ user_id: state.user.id, name: preset.name, category: category }).select().single()
+      .then(function (res) {
+        if (res.error) throw res.error;
+        var newTplId = res.data.id;
+        var rows = exercises.map(function (ex, i) {
+          return {
+            user_id: state.user.id,
+            template_id: newTplId,
+            name: ex.name,
+            instructions: ex.instructions,
+            duration_seconds: ex.duration_seconds,
+            order_index: i
+          };
+        });
+        return sb.from("template_exercises").insert(rows).select().then(function (res2) {
+          if (res2.error) throw res2.error;
+          return loadTemplates().then(function () {
+            return { id: newTplId, name: preset.name, category: category, exercises: res2.data };
+          });
+        });
+      });
+  }
+
   function startWorkout() {
     withBusy(function () {
       state.authError = "";
@@ -2274,28 +2228,44 @@
       if (w.kind === "template") {
         return beginSession(w.data.id, w.data.name, state.currentWorkoutExercises);
       }
-      var preset = w.data;
-      return sb.from("workout_templates").insert({ user_id: state.user.id, name: preset.name, category: state.currentCategory }).select().single()
+      return clonePresetToPersonal(w.data, state.currentWorkoutExercises, state.currentCategory).then(function (tpl) {
+        return beginSession(tpl.id, tpl.name, tpl.exercises);
+      });
+    });
+  }
+
+  function personalizeWorkout() {
+    withBusy(function () {
+      state.authError = "";
+      var w = state.currentWorkout;
+      return clonePresetToPersonal(w.data, state.currentWorkoutExercises, state.currentCategory).then(function (tpl) {
+        var t = state.templates.filter(function (x) { return x.id === tpl.id; })[0];
+        state.currentTemplate = t || { id: tpl.id, name: tpl.name, category: tpl.category };
+        state.currentCategory = tpl.category;
+        state.view = "template";
+        return loadTemplateExercises(tpl.id);
+      }).then(function () {
+        showFlash("Obiettivo personalizzato");
+      });
+    });
+  }
+
+  function toggleFavorite(presetId) {
+    withBusy(function () {
+      state.authError = "";
+      var isFav = state.favoriteIds.indexOf(presetId) !== -1;
+      if (isFav) {
+        return sb.from("favorites").delete().eq("user_id", state.user.id).eq("preset_template_id", presetId).select().single()
+          .then(function (res) {
+            if (res.error) throw res.error;
+            return loadFavorites();
+          }).then(function () { showFlash("Rimosso dai preferiti"); });
+      }
+      return sb.from("favorites").insert({ user_id: state.user.id, preset_template_id: presetId }).select().single()
         .then(function (res) {
           if (res.error) throw res.error;
-          var newTplId = res.data.id;
-          var rows = state.currentWorkoutExercises.map(function (ex, i) {
-            return {
-              user_id: state.user.id,
-              template_id: newTplId,
-              name: ex.name,
-              instructions: ex.instructions,
-              duration_seconds: ex.duration_seconds,
-              order_index: i
-            };
-          });
-          return sb.from("template_exercises").insert(rows).select().then(function (res2) {
-            if (res2.error) throw res2.error;
-            return loadTemplates().then(function () {
-              return beginSession(newTplId, preset.name, res2.data);
-            });
-          });
-        });
+          return loadFavorites();
+        }).then(function () { showFlash("Aggiunto ai preferiti"); });
     });
   }
 
@@ -2470,8 +2440,6 @@
       else if (view === "benessere") openBenessere();
     }
     else if (action === "go-home") goHome();
-    else if (action === "new-template") newTemplate();
-    else if (action === "new-template-in-category") newTemplateInCategory(el.getAttribute("data-id"));
     else if (action === "open-template") openTemplate(id);
     else if (action === "delete-exercise") deleteExercise(id);
     else if (action === "delete-template") deleteTemplate(id);
@@ -2507,6 +2475,8 @@
     else if (action === "back-from-profile") backFromProfile();
     else if (action === "cancel-session") cancelSession();
     else if (action === "delete-session") deleteSession(id);
+    else if (action === "personalize-workout") personalizeWorkout();
+    else if (action === "toggle-favorite") toggleFavorite(id);
   });
 
   // ---------- boot ----------

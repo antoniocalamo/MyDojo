@@ -1315,6 +1315,23 @@
     html += '<p class="page-sub">Gestisci i saluti e i consigli mostrati in cima a "Il mio piano". Nel testo puoi usare {streak}: verrà sostituito con il numero di giorni consecutivi di allenamento.</p>';
     if (state.authError) html += '<div class="error-msg">' + escapeHtml(state.authError) + '</div>';
 
+    html += '<h3 class="section-title" style="margin-top:6px;">' + (p.id ? "Modifica messaggio" : "Nuovo messaggio") + '</h3>';
+    html += '<form data-action="save-plan-message">' +
+      '<label>Tipo</label>' +
+      '<select name="kind">' +
+        ["greeting_pending", "greeting_done", "tip"].map(function (k) {
+          return '<option value="' + k + '" ' + (p.kind === k ? "selected" : "") + '>' + PLAN_MESSAGE_KIND_LABELS[k] + '</option>';
+        }).join("") +
+      '</select>' +
+      '<label>Testo</label>' +
+      '<textarea name="text" rows="2" required>' + escapeHtml(p.text || "") + '</textarea>' +
+      '<label class="checkbox-item"><input type="checkbox" name="active" ' + (p.active !== false ? "checked" : "") + '> Attivo (visibile nell\'app)</label>' +
+      '<button class="btn btn-accent" type="submit" style="margin-top:10px;">' + (p.id ? "Salva modifiche" : "Aggiungi messaggio") + '</button>' +
+    '</form>';
+    if (p.id) {
+      html += '<button class="btn btn-ghost" data-action="cancel-edit-plan-message" style="margin-top:8px;">Annulla modifica</button>';
+    }
+
     ["greeting_pending", "greeting_done", "tip"].forEach(function (kind) {
       var items = state.dashboardMessages.filter(function (m) { return m.kind === kind; });
       html += '<h3 class="section-title">' + PLAN_MESSAGE_KIND_LABELS[kind] + '</h3>';
@@ -1332,23 +1349,6 @@
         });
       }
     });
-
-    html += '<h3 class="section-title">' + (p.id ? "Modifica messaggio" : "Nuovo messaggio") + '</h3>';
-    html += '<form data-action="save-plan-message">' +
-      '<label>Tipo</label>' +
-      '<select name="kind">' +
-        ["greeting_pending", "greeting_done", "tip"].map(function (k) {
-          return '<option value="' + k + '" ' + (p.kind === k ? "selected" : "") + '>' + PLAN_MESSAGE_KIND_LABELS[k] + '</option>';
-        }).join("") +
-      '</select>' +
-      '<label>Testo</label>' +
-      '<textarea name="text" rows="2" required>' + escapeHtml(p.text || "") + '</textarea>' +
-      '<label class="checkbox-item"><input type="checkbox" name="active" ' + (p.active !== false ? "checked" : "") + '> Attivo (visibile nell\'app)</label>' +
-      '<button class="btn btn-accent" type="submit" style="margin-top:10px;">' + (p.id ? "Salva modifiche" : "Aggiungi messaggio") + '</button>' +
-    '</form>';
-    if (p.id) {
-      html += '<button class="btn btn-ghost" data-action="cancel-edit-plan-message" style="margin-top:8px;">Annulla modifica</button>';
-    }
 
     return html;
   }

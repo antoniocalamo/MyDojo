@@ -344,6 +344,12 @@
   .circuit-timer { font-size: 96px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
   .circuit-bar-track { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
   .circuit-bar-fill { height: 100%; background: var(--cta); border-radius: 999px; transition: width 1s linear; }
+  .circuit-top-row { display: flex; align-items: center; justify-content: space-between; }
+  .circuit-ring-wrap { width: 56px; height: 56px; flex-shrink: 0; }
+  .circuit-ring { width: 56px; height: 56px; transform: rotate(-90deg); }
+  .circuit-ring-track { fill: none; stroke: var(--surface-2); stroke-width: 5; }
+  .circuit-ring-fill { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+  .circuit-ring-fill.rest { stroke: var(--text-dim); }
 
   /* libreria esercizi */
   select {
@@ -700,12 +706,17 @@
     var c = state.circuit;
     var secEl = document.getElementById("circuit-seconds");
     var barEl = document.getElementById("circuit-bar-fill");
+    var ringEl = document.getElementById("circuit-ring-fill");
     if (!c || !secEl || !barEl) return;
     var current = state.sessionExercises[c.index];
     var totalForPhase = c.phase === "rest" ? REST_SECONDS : current.duration_seconds;
     secEl.textContent = c.secondsLeft;
     var pct = Math.max(0, Math.min(100, Math.round((c.secondsLeft / totalForPhase) * 100)));
     barEl.style.width = pct + "%";
+    if (ringEl) {
+      var circumference = 2 * Math.PI * 28;
+      ringEl.style.strokeDashoffset = (circumference * (1 - pct / 100)).toFixed(2);
+    }
   }
 
   function tickCircuit() {
@@ -1314,8 +1325,18 @@
     var totalForPhase = isRest ? REST_SECONDS : current.duration_seconds;
     var pct = Math.max(0, Math.min(100, Math.round((c.secondsLeft / totalForPhase) * 100)));
     var videoUrl = !isRest ? findExerciseMedia(current) : null;
+    var circumference = 2 * Math.PI * 28;
+    var ringOffset = circumference * (1 - pct / 100);
 
-    var html = '<button class="back-btn" data-action="go-home">←</button>';
+    var html = '<div class="circuit-top-row">' +
+      '<button class="back-btn" data-action="go-home">←</button>' +
+      '<div class="circuit-ring-wrap">' +
+        '<svg viewBox="0 0 64 64" class="circuit-ring">' +
+          '<circle class="circuit-ring-track" cx="32" cy="32" r="28"></circle>' +
+          '<circle class="circuit-ring-fill' + (isRest ? " rest" : "") + '" id="circuit-ring-fill" cx="32" cy="32" r="28" stroke-dasharray="' + circumference.toFixed(2) + '" stroke-dashoffset="' + ringOffset.toFixed(2) + '"></circle>' +
+        '</svg>' +
+      '</div>' +
+    '</div>';
     html += '<p class="circuit-progress">Esercizio ' + (c.index + 1) + ' di ' + exs.length + '</p>';
     html += '<div class="circuit-phase-tag ' + (isRest ? "rest" : "work") + '">' + (isRest ? "RIPOSO" : "IN CORSO") + '</div>';
     html += '<h2 class="circuit-exname">' + escapeHtml(isRest ? (nextEx ? "Prossimo: " + nextEx.name : "Ultimo esercizio") : current.name) + '</h2>';
@@ -1333,11 +1354,14 @@
       '</div>';
     }
 
-    html += '<div class="btn-row" style="margin-top:24px;">' +
-      '<button class="btn btn-ghost" data-action="circuit-pause">' + (c.paused ? "▶ Riprendi" : "⏸ Pausa") + '</button>' +
-      '<button class="btn btn-accent" data-action="circuit-skip">Salta ⏭</button>' +
+    html += '<div style="height:150px;"></div>';
+    html += '<div class="fixed-cta">' +
+      '<div class="btn-row">' +
+        '<button class="btn btn-ghost" data-action="circuit-pause">' + (c.paused ? "▶ Riprendi" : "⏸ Pausa") + '</button>' +
+        '<button class="btn btn-accent" data-action="circuit-skip">Salta ⏭</button>' +
+      '</div>' +
+      '<button class="btn btn-danger btn-small" data-action="cancel-session" style="width:100%;margin-top:8px;">Annulla allenamento</button>' +
     '</div>';
-    html += '<button class="btn btn-danger btn-small" data-action="cancel-session" style="width:100%;margin-top:10px;">Annulla allenamento</button>';
 
     return html;
   }

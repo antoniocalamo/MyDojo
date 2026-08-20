@@ -853,11 +853,24 @@
     ensureVideosPlay();
   }
 
+  function handleVideoError(e) {
+    var v = e.target;
+    var codes = { 1: "richiesta interrotta", 2: "errore di rete", 3: "errore di decodifica", 4: "formato non supportato dal browser" };
+    var code = v.error ? v.error.code : null;
+    var msg = "Video non disponibile" + (code ? " (" + (codes[code] || ("errore " + code)) + ")" : "");
+    var fallback = document.createElement("div");
+    fallback.className = "info-msg";
+    fallback.style.textAlign = "center";
+    fallback.textContent = msg;
+    if (v.parentNode) v.parentNode.replaceChild(fallback, v);
+  }
+
   function ensureVideosPlay() {
     var videos = app.querySelectorAll("video");
     for (var i = 0; i < videos.length; i++) {
       var v = videos[i];
       v.muted = true;
+      v.addEventListener("error", handleVideoError);
       var p = v.play();
       if (p && p.catch) p.catch(function () {});
     }

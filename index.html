@@ -148,6 +148,36 @@
   .hero-card .hero-meta { font-size: 13px; color: var(--text-dim); margin: 2px 0 0; }
   .hero-card.live { box-shadow: 0 0 0 3px var(--cta); }
 
+  .greeting-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .greeting-card .mascot-badge { width: 48px; height: 48px; flex-shrink: 0; }
+  .greeting-text { min-width: 0; }
+  .greeting-msg { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.3; }
+  .greeting-streak {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .greeting-tip {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    margin: 0 0 14px;
+    padding: 0 4px;
+  }
+
   .tag {
     display: inline-block;
     font-size: 11px;
@@ -635,6 +665,8 @@
     currentWorkoutExercises: [],
     currentPresetAdmin: null,
     currentPresetAdminExercises: [],
+    dashboardMessages: [],
+    currentPlanMessage: null,
     favoriteIds: [],
     workoutStartOptions: { warmup: false, silent: false },
     circuit: null,
@@ -828,7 +860,7 @@
       return;
     }
 
-    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "categoryDetail", "workoutDetail", "presetAdmin", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEdit"];
+    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "categoryDetail", "workoutDetail", "presetAdmin", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEdit", "planMessagesAdmin"];
     if (knownViews.indexOf(state.view) === -1) state.view = "plan";
 
     var tabs = ["plan", "home", "benessere", "history"];
@@ -850,6 +882,7 @@
     else if (state.view === "library") body = renderLibrary();
     else if (state.view === "libraryDetail") body = renderLibraryDetail();
     else if (state.view === "libraryForm") body = renderLibraryForm();
+    else if (state.view === "planMessagesAdmin") body = renderPlanMessagesAdmin();
     else body = renderHome();
 
     app.innerHTML =
@@ -977,9 +1010,69 @@
     });
   }
 
+  function isSameDay(d1, d2) {
+    return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+  }
+
+  function hasTrainedOnDate(date) {
+    return state.history.some(function (s) {
+      return s.finished_at && isSameDay(new Date(s.finished_at), date);
+    });
+  }
+
+  function hasTrainedToday() {
+    return hasTrainedOnDate(new Date());
+  }
+
+  function computeStreak() {
+    var cursor = new Date();
+    if (!hasTrainedOnDate(cursor)) {
+      cursor.setDate(cursor.getDate() - 1);
+      if (!hasTrainedOnDate(cursor)) return 0;
+    }
+    var streak = 0;
+    while (hasTrainedOnDate(cursor)) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return streak;
+  }
+
+  function dayOfYear(d) {
+    var start = new Date(d.getFullYear(), 0, 0);
+    return Math.floor((d - start) / 86400000);
+  }
+
+  function pickDailyMessage(list) {
+    if (!list || list.length === 0) return null;
+    var idx = dayOfYear(new Date()) % list.length;
+    return list[idx].text;
+  }
+
+  function renderPlanGreeting() {
+    var trainedToday = hasTrainedToday();
+    var streak = computeStreak();
+    var activeMessages = state.dashboardMessages.filter(function (m) { return m.active; });
+    var pool = activeMessages.filter(function (m) { return m.kind === (trainedToday ? "greeting_done" : "greeting_pending"); });
+    var greeting = pickDailyMessage(pool) || (trainedToday ? "Allenamento di oggi fatto! Sei un vero guerriero 🎉" : "Pronto per allenarti oggi?");
+    greeting = greeting.replace(/\{streak\}/g, streak);
+    var tip = pickDailyMessage(activeMessages.filter(function (m) { return m.kind === "tip"; }));
+
+    var html = '<div class="greeting-card">' +
+      mascotBadge(MASCOT_HEAD, 76) +
+      '<div class="greeting-text">' +
+        '<p class="greeting-msg">' + escapeHtml(greeting) + '</p>' +
+        (streak > 0 ? '<span class="greeting-streak">🔥 ' + streak + ' giorni di fila</span>' : '') +
+      '</div>' +
+    '</div>';
+    if (tip) html += '<p class="greeting-tip">💡 ' + escapeHtml(tip) + '</p>';
+    return html;
+  }
+
   function renderPlan() {
     var todayIdx = currentWeekdayIndex();
-    var html = '<p class="page-sub" style="margin-top:2px;">La tua settimana tipo</p>';
+    var html = renderPlanGreeting();
+    html += '<p class="page-sub" style="margin-top:2px;">La tua settimana tipo</p>';
 
     if (state.activeSession) {
       html += '<div class="hero-card live" style="background:' + gradientFor(state.activeSession.template_id || state.activeSession.id) + ';" data-action="resume-session">' +
@@ -1204,6 +1297,57 @@
       '</form>';
 
       html += '<button class="btn btn-danger" data-action="delete-preset-admin" data-id="' + p.id + '" style="margin-top:24px;">Elimina obiettivo dal catalogo</button>';
+    }
+
+    return html;
+  }
+
+  var PLAN_MESSAGE_KIND_LABELS = {
+    greeting_pending: "Saluto (prima di allenarsi)",
+    greeting_done: "Saluto (dopo l'allenamento)",
+    tip: "Consiglio"
+  };
+
+  function renderPlanMessagesAdmin() {
+    var p = state.currentPlanMessage || { kind: "greeting_pending", text: "", active: true };
+    var html = '<button class="back-btn" data-action="back-from-plan-messages">←</button>';
+    html += '<h1 class="page-title">Messaggi del piano (admin)</h1>';
+    html += '<p class="page-sub">Gestisci i saluti e i consigli mostrati in cima a "Il mio piano". Nel testo puoi usare {streak}: verrà sostituito con il numero di giorni consecutivi di allenamento.</p>';
+    if (state.authError) html += '<div class="error-msg">' + escapeHtml(state.authError) + '</div>';
+
+    ["greeting_pending", "greeting_done", "tip"].forEach(function (kind) {
+      var items = state.dashboardMessages.filter(function (m) { return m.kind === kind; });
+      html += '<h3 class="section-title">' + PLAN_MESSAGE_KIND_LABELS[kind] + '</h3>';
+      if (items.length === 0) {
+        html += '<p class="page-sub" style="margin:0 0 8px;">Nessun messaggio ancora.</p>';
+      } else {
+        items.forEach(function (m) {
+          html += '<div class="exercise-row">' +
+            '<span class="name"' + (m.active ? "" : ' style="opacity:0.45;"') + '>' + escapeHtml(m.text) +
+              (m.active ? "" : ' <span class="tag" style="background:var(--surface-2);color:var(--text-dim);">disattivato</span>') +
+            '</span>' +
+            '<button data-action="edit-plan-message" data-id="' + m.id + '" style="margin-right:6px;">✏️</button>' +
+            '<button data-action="delete-plan-message" data-id="' + m.id + '">&times;</button>' +
+          '</div>';
+        });
+      }
+    });
+
+    html += '<h3 class="section-title">' + (p.id ? "Modifica messaggio" : "Nuovo messaggio") + '</h3>';
+    html += '<form data-action="save-plan-message">' +
+      '<label>Tipo</label>' +
+      '<select name="kind">' +
+        ["greeting_pending", "greeting_done", "tip"].map(function (k) {
+          return '<option value="' + k + '" ' + (p.kind === k ? "selected" : "") + '>' + PLAN_MESSAGE_KIND_LABELS[k] + '</option>';
+        }).join("") +
+      '</select>' +
+      '<label>Testo</label>' +
+      '<textarea name="text" rows="2" required>' + escapeHtml(p.text || "") + '</textarea>' +
+      '<label class="checkbox-item"><input type="checkbox" name="active" ' + (p.active !== false ? "checked" : "") + '> Attivo (visibile nell\'app)</label>' +
+      '<button class="btn btn-accent" type="submit" style="margin-top:10px;">' + (p.id ? "Salva modifiche" : "Aggiungi messaggio") + '</button>' +
+    '</form>';
+    if (p.id) {
+      html += '<button class="btn btn-ghost" data-action="cancel-edit-plan-message" style="margin-top:8px;">Annulla modifica</button>';
     }
 
     return html;
@@ -1602,7 +1746,11 @@
     });
     html += '</div>';
 
-    html += '<button class="btn btn-ghost" data-action="logout" style="margin-top:28px;">Esci</button>';
+    if (isAdmin()) {
+      html += '<button class="btn btn-ghost" data-action="open-plan-messages-admin" style="margin-top:20px;">🛠️ Messaggi del piano (admin)</button>';
+    }
+
+    html += '<button class="btn btn-ghost" data-action="logout" style="margin-top:12px;">Esci</button>';
     return html;
   }
 
@@ -1706,6 +1854,14 @@
       });
   }
 
+  function loadDashboardMessages() {
+    return sb.from("dashboard_messages").select("*").order("created_at", { ascending: true })
+      .then(function (res) {
+        if (res.error) throw res.error;
+        state.dashboardMessages = res.data;
+      });
+  }
+
   function loadLibraryExercises() {
     return sb.from("exercises").select("*").order("name", { ascending: true })
       .then(function (res) {
@@ -1770,7 +1926,7 @@
 
   function loadPlanData() {
     state.authError = "";
-    return Promise.all([loadTemplates(), loadActiveSession(), loadWeeklyPlan(), loadHistory()]).then(function () {
+    return Promise.all([loadTemplates(), loadActiveSession(), loadWeeklyPlan(), loadHistory(), loadDashboardMessages()]).then(function () {
       state.view = "plan";
     });
   }
@@ -2161,6 +2317,58 @@
     });
   }
 
+  function openPlanMessagesAdmin() {
+    withBusy(function () {
+      state.authError = "";
+      state.currentPlanMessage = { kind: "greeting_pending", text: "", active: true };
+      state.view = "planMessagesAdmin";
+      return loadDashboardMessages();
+    });
+  }
+
+  function editPlanMessage(id) {
+    var m = state.dashboardMessages.filter(function (x) { return x.id === id; })[0];
+    if (!m) return;
+    state.currentPlanMessage = { id: m.id, kind: m.kind, text: m.text, active: m.active };
+    render();
+  }
+
+  function cancelEditPlanMessage() {
+    state.currentPlanMessage = { kind: "greeting_pending", text: "", active: true };
+    render();
+  }
+
+  function savePlanMessage(kind, text, active) {
+    withBusy(function () {
+      state.authError = "";
+      var editing = state.currentPlanMessage && state.currentPlanMessage.id;
+      var payload = { kind: kind, text: text, active: active };
+      var call = editing
+        ? sb.from("dashboard_messages").update(payload).eq("id", state.currentPlanMessage.id).select().single()
+        : sb.from("dashboard_messages").insert(payload).select().single();
+      return call.then(function (res) {
+        if (res.error) throw res.error;
+        state.currentPlanMessage = { kind: kind, text: "", active: true };
+        return loadDashboardMessages();
+      }).then(function () {
+        showFlash(editing ? "Messaggio aggiornato" : "Messaggio aggiunto");
+      });
+    });
+  }
+
+  function deletePlanMessage(id) {
+    if (!confirm("Eliminare questo messaggio?")) return;
+    withBusy(function () {
+      state.authError = "";
+      return sb.from("dashboard_messages").delete().eq("id", id).select().single().then(function (res) {
+        if (res.error) throw res.error;
+        return loadDashboardMessages();
+      }).then(function () {
+        showFlash("Messaggio eliminato");
+      });
+    });
+  }
+
   var GENERIC_WARMUP = {
     normal: [
       { name: "Jumping Jacks", duration_seconds: 30, instructions: "Salta divaricando le gambe e alzando le braccia sopra la testa, poi torna alla posizione di partenza, a ritmo costante." },
@@ -2412,6 +2620,7 @@
     } else if (action === "save-library-exercise") saveLibraryExercise(form);
     else if (action === "save-plan") savePlan(form);
     else if (action === "save-preset-admin") savePresetAdmin(form.name.value.trim(), form.description.value.trim(), form.category.value);
+    else if (action === "save-plan-message") savePlanMessage(form.kind.value, form.text.value.trim(), form.active.checked);
     else if (action === "add-preset-exercise") {
       var peName = form.exname.value.trim();
       var peInstr = form.exinstructions.value.trim();
@@ -2456,6 +2665,11 @@
     else if (action === "open-preset-admin") openPresetAdmin(id);
     else if (action === "delete-preset-exercise") deletePresetExercise(id);
     else if (action === "delete-preset-admin") deletePresetAdmin(id);
+    else if (action === "open-plan-messages-admin") openPlanMessagesAdmin();
+    else if (action === "edit-plan-message") editPlanMessage(id);
+    else if (action === "delete-plan-message") deletePlanMessage(id);
+    else if (action === "cancel-edit-plan-message") cancelEditPlanMessage();
+    else if (action === "back-from-plan-messages") { state.view = "plan"; render(); }
     else if (action === "toggle-warmup") { state.workoutStartOptions.warmup = !state.workoutStartOptions.warmup; render(); }
     else if (action === "toggle-silent") { state.workoutStartOptions.silent = !state.workoutStartOptions.silent; render(); }
     else if (action === "circuit-pause") toggleCircuitPause();

@@ -436,7 +436,7 @@
     margin-bottom: 10px;
     display: block;
     background: #000;
-    object-fit: cover;
+    object-fit: contain;
   }
 
   .muscle-list { margin-bottom: 6px; }
@@ -1214,7 +1214,7 @@
     var ex = state.currentLibraryExercise;
     var html = '<button class="back-btn" data-action="back-to-library">←</button>';
     if (isVideoUrl(ex.image_url)) {
-      html += '<video class="exlib-detail-video" src="' + escapeHtml(ex.image_url) + '" autoplay muted loop playsinline></video>';
+      html += '<video class="exlib-detail-video" src="' + escapeHtml(ex.image_url) + '" autoplay muted loop playsinline preload="auto"></video>';
     } else {
       html += '<div class="exlib-detail-banner">' + equipmentIcon(ex.equipment) + '</div>';
     }
@@ -1375,7 +1375,7 @@
     html += '<h2 class="circuit-exname">' + escapeHtml(isRest ? (nextEx ? "Prossimo: " + nextEx.name : "Ultimo esercizio") : current.name) + '</h2>';
 
     if (videoUrl) {
-      html += '<video class="exlib-detail-video" src="' + escapeHtml(videoUrl) + '" autoplay muted loop playsinline style="max-height:160px;margin-top:4px;margin-bottom:0;"></video>';
+      html += '<video class="exlib-detail-video" src="' + escapeHtml(videoUrl) + '" autoplay muted loop playsinline preload="auto" style="max-height:280px;margin-top:4px;margin-bottom:0;"></video>';
     }
 
     if (!isRest && current.instructions) {

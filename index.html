@@ -430,6 +430,7 @@
   }
   .exlib-detail-video {
     width: 100%;
+    aspect-ratio: 1 / 1;
     max-height: 320px;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border);
@@ -871,6 +872,11 @@
       var v = videos[i];
       v.muted = true;
       v.addEventListener("error", handleVideoError);
+      v.addEventListener("loadedmetadata", function () {
+        if (this.videoWidth && this.videoHeight) {
+          this.style.aspectRatio = this.videoWidth + " / " + this.videoHeight;
+        }
+      });
       var p = v.play();
       if (p && p.catch) p.catch(function () {});
     }
@@ -1400,7 +1406,7 @@
     html += '<h2 class="circuit-exname">' + escapeHtml(isRest ? (nextEx ? "Prossimo: " + nextEx.name : "Ultimo esercizio") : current.name) + '</h2>';
 
     if (videoUrl) {
-      html += '<video class="exlib-detail-video" src="' + escapeHtml(videoUrl) + '" autoplay muted loop playsinline preload="auto" style="max-height:280px;margin-top:4px;margin-bottom:0;"></video>';
+      html += '<video class="exlib-detail-video" src="' + escapeHtml(videoUrl) + '" autoplay muted loop playsinline preload="auto" style="width:200px;max-height:none;margin:4px auto 0;"></video>';
     }
 
     if (!isRest && current.instructions) {

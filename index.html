@@ -362,21 +362,18 @@
   header.app-header .profile-btn img { width: 26px; height: auto; display: block; }
 
   /* circuito a tempo */
-  .circuit-progress { color: var(--text-dim); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin: 4px 0 10px; }
-  .circuit-phase-tag { display: inline-block; padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; margin-bottom: 12px; }
+  .circuit-progress { color: var(--text-dim); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin: 4px 0 6px; }
+  .circuit-phase-tag { display: inline-block; padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; margin-bottom: 8px; }
   .circuit-phase-tag.work { background: var(--accent); color: var(--accent-ink); }
   .circuit-phase-tag.rest { background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border); }
-  .circuit-exname { font-size: 26px; font-weight: 800; margin: 0 0 20px; letter-spacing: -0.02em; }
-  .circuit-timer-wrap { text-align: center; margin: 10px 0 20px; }
-  .circuit-timer { font-size: 96px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-  .circuit-bar-track { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
-  .circuit-bar-fill { height: 100%; background: var(--cta); border-radius: 999px; transition: width 1s linear; }
+  .circuit-exname { font-size: 22px; font-weight: 800; margin: 0 0 6px; letter-spacing: -0.02em; }
   .circuit-top-row { display: flex; align-items: center; justify-content: space-between; }
-  .circuit-ring-wrap { width: 56px; height: 56px; flex-shrink: 0; }
-  .circuit-ring { width: 56px; height: 56px; transform: rotate(-90deg); }
-  .circuit-ring-track { fill: none; stroke: var(--surface-2); stroke-width: 5; }
-  .circuit-ring-fill { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+  .circuit-ring-wrap { position: relative; width: 92px; height: 92px; flex-shrink: 0; }
+  .circuit-ring { width: 92px; height: 92px; transform: rotate(-90deg); }
+  .circuit-ring-track { fill: none; stroke: var(--surface-2); stroke-width: 6; }
+  .circuit-ring-fill { fill: none; stroke: var(--accent); stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
   .circuit-ring-fill.rest { stroke: var(--text-dim); }
+  .circuit-ring-number { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
 
   /* libreria esercizi */
   select {
@@ -739,15 +736,13 @@
   function updateCircuitDom() {
     var c = state.circuit;
     var secEl = document.getElementById("circuit-seconds");
-    var barEl = document.getElementById("circuit-bar-fill");
     var ringEl = document.getElementById("circuit-ring-fill");
-    if (!c || !secEl || !barEl) return;
+    if (!c || !secEl) return;
     var current = state.sessionExercises[c.index];
     var totalForPhase = c.phase === "rest" ? REST_SECONDS : current.duration_seconds;
     secEl.textContent = c.secondsLeft;
-    var pct = Math.max(0, Math.min(100, Math.round((c.secondsLeft / totalForPhase) * 100)));
-    barEl.style.width = pct + "%";
     if (ringEl) {
+      var pct = Math.max(0, Math.min(100, Math.round((c.secondsLeft / totalForPhase) * 100)));
       var circumference = 2 * Math.PI * 28;
       ringEl.style.strokeDashoffset = (circumference * (1 - pct / 100)).toFixed(2);
     }
@@ -1372,20 +1367,19 @@
           '<circle class="circuit-ring-track" cx="32" cy="32" r="28"></circle>' +
           '<circle class="circuit-ring-fill' + (isRest ? " rest" : "") + '" id="circuit-ring-fill" cx="32" cy="32" r="28" stroke-dasharray="' + circumference.toFixed(2) + '" stroke-dashoffset="' + ringOffset.toFixed(2) + '"></circle>' +
         '</svg>' +
+        '<span class="circuit-ring-number" id="circuit-seconds">' + c.secondsLeft + '</span>' +
       '</div>' +
     '</div>';
     html += '<p class="circuit-progress">Esercizio ' + (c.index + 1) + ' di ' + exs.length + '</p>';
     html += '<div class="circuit-phase-tag ' + (isRest ? "rest" : "work") + '">' + (isRest ? "RIPOSO" : "IN CORSO") + '</div>';
     html += '<h2 class="circuit-exname">' + escapeHtml(isRest ? (nextEx ? "Prossimo: " + nextEx.name : "Ultimo esercizio") : current.name) + '</h2>';
-    html += '<div class="circuit-timer-wrap"><div class="circuit-timer" id="circuit-seconds">' + c.secondsLeft + '</div></div>';
-    html += '<div class="circuit-bar-track"><div class="circuit-bar-fill" id="circuit-bar-fill" style="width:' + pct + '%;"></div></div>';
 
     if (videoUrl) {
-      html += '<video class="exlib-detail-video" src="' + escapeHtml(videoUrl) + '" autoplay muted loop playsinline style="max-height:220px;margin-top:18px;margin-bottom:0;"></video>';
+      html += '<video class="exlib-detail-video" src="' + escapeHtml(videoUrl) + '" autoplay muted loop playsinline style="max-height:160px;margin-top:4px;margin-bottom:0;"></video>';
     }
 
     if (!isRest && current.instructions) {
-      html += '<div class="card" style="margin-top:20px;">' +
+      html += '<div class="card" style="margin-top:10px;">' +
         '<p class="section-title" style="margin-top:0;margin-bottom:6px;font-size:13px;font-weight:800;">Come si fa</p>' +
         '<p style="margin:0;line-height:1.5;">' + escapeHtml(current.instructions) + '</p>' +
       '</div>';

@@ -449,7 +449,9 @@
     border-bottom: 1px solid var(--border);
     font-size: 14px;
   }
-  .muscle-dots { color: var(--accent); letter-spacing: 2px; }
+  .muscle-dots { display: inline-flex; align-items: center; gap: 4px; }
+  .muscle-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .muscle-dot.filled { background: var(--accent); }
 
   .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 14px; }
   .checkbox-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); font-weight: 500; cursor: pointer; margin-bottom: 0; }
@@ -1231,7 +1233,7 @@
   function muscleRow(muscle, primary) {
     var filled = primary ? 5 : 3;
     var dots = "";
-    for (var i = 0; i < 5; i++) dots += (i < filled ? "●" : "○");
+    for (var i = 0; i < 5; i++) dots += '<span class="muscle-dot' + (i < filled ? " filled" : "") + '"></span>';
     return '<div class="muscle-row"><span>' + escapeHtml(muscle) +
       (primary ? ' <span class="tag tag-solid" style="font-size:10px;">Primario</span>' : '') +
       '</span><span class="muscle-dots">' + dots + '</span></div>';

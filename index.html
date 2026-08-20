@@ -849,6 +849,18 @@
       startWorkoutTimer(state.activeSession.started_at);
       if (isCircuitSession()) startCircuitTimer();
     }
+
+    ensureVideosPlay();
+  }
+
+  function ensureVideosPlay() {
+    var videos = app.querySelectorAll("video");
+    for (var i = 0; i < videos.length; i++) {
+      var v = videos[i];
+      v.muted = true;
+      var p = v.play();
+      if (p && p.catch) p.catch(function () {});
+    }
   }
 
   function renderScreenHeader(title) {

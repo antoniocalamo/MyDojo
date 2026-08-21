@@ -1072,7 +1072,23 @@
   function renderPlan() {
     var todayIdx = currentWeekdayIndex();
     var html = renderPlanGreeting();
-    html += '<p class="page-sub" style="margin-top:2px;">La tua settimana tipo</p>';
+
+    var assignedCount = 0, completedCount = 0, missedDay = null;
+    var dayEntries = WEEKDAY_NAMES.map(function (name, idx) {
+      var assignment = state.weeklyPlan.filter(function (p) { return p.weekday === idx; })[0];
+      var tpl = assignment && assignment.template_id ? state.templates.filter(function (t) { return t.id === assignment.template_id; })[0] : null;
+      var done = tpl ? isDayCompleted(tpl.id) : false;
+      if (tpl) {
+        assignedCount++;
+        if (done) completedCount++;
+        else if (idx < todayIdx && !missedDay) missedDay = { name: name, tpl: tpl };
+      }
+      return { name: name, idx: idx, tpl: tpl, done: done };
+    });
+
+    html += '<p class="page-sub" style="margin-top:2px;">' +
+      (assignedCount > 0 ? completedCount + ' di ' + assignedCount + ' allenamenti fatti questa settimana' : 'La tua settimana tipo') +
+    '</p>';
 
     if (state.activeSession) {
       html += '<div class="hero-card live" style="background:' + gradientFor(state.activeSession.template_id || state.activeSession.id) + ';" data-action="resume-session">' +
@@ -1081,20 +1097,24 @@
         '<p class="hero-title">' + escapeHtml(state.activeSession.template_name) + '</p>' +
         '<p class="hero-meta">Iniziato il ' + formatDate(state.activeSession.started_at) + ' — tocca per riprendere</p>' +
       '</div>';
+    } else if (missedDay) {
+      html += '<div class="hero-card" style="background:' + gradientFor(missedDay.tpl.id) + ';" data-action="start-session" data-id="' + missedDay.tpl.id + '">' +
+        '<span class="hero-icon">⏱️</span>' +
+        '<span class="tag tag-solid" style="width:fit-content;margin-bottom:8px;">Recupero</span>' +
+        '<p class="hero-title">' + escapeHtml(missedDay.tpl.name) + '</p>' +
+        '<p class="hero-meta">Saltato ' + missedDay.name + ' — tocca per recuperarlo oggi</p>' +
+      '</div>';
     }
 
-    WEEKDAY_NAMES.forEach(function (name, idx) {
-      var assignment = state.weeklyPlan.filter(function (p) { return p.weekday === idx; })[0];
-      var tpl = assignment && assignment.template_id ? state.templates.filter(function (t) { return t.id === assignment.template_id; })[0] : null;
-      var isToday = idx === todayIdx;
-      var done = tpl ? isDayCompleted(tpl.id) : false;
-      var clickable = tpl && !state.activeSession;
+    dayEntries.forEach(function (d) {
+      var isToday = d.idx === todayIdx;
+      var clickable = d.tpl && !state.activeSession;
       html += '<div class="plan-day' + (isToday ? " today" : "") + (clickable ? " clickable" : "") + '"' +
-        (clickable ? ' data-action="start-session" data-id="' + tpl.id + '"' : '') + '>' +
-        '<span class="plan-check' + (done ? " done" : "") + '">' + (done ? "✓" : "") + '</span>' +
+        (clickable ? ' data-action="start-session" data-id="' + d.tpl.id + '"' : '') + '>' +
+        '<span class="plan-check' + (d.done ? " done" : "") + '">' + (d.done ? "✓" : "") + '</span>' +
         '<div class="plan-day-info">' +
-          '<span class="plan-day-name">' + name + (isToday ? ' <span class="tag tag-solid" style="font-size:10px;">Oggi</span>' : '') + '</span>' +
-          '<span class="plan-day-workout">' + (tpl ? escapeHtml(tpl.name) : "Riposo") + '</span>' +
+          '<span class="plan-day-name">' + d.name + (isToday ? ' <span class="tag tag-solid" style="font-size:10px;">Oggi</span>' : '') + '</span>' +
+          '<span class="plan-day-workout">' + (d.tpl ? escapeHtml(d.tpl.name) : "Riposo") + '</span>' +
         '</div>' +
       '</div>';
     });

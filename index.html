@@ -1607,7 +1607,11 @@
     '</div>';
 
     var list = state.libraryExercises.filter(function (ex) {
-      if (state.libraryFilterMuscle && ex.muscle_primary !== state.libraryFilterMuscle) return false;
+      if (state.libraryFilterMuscle) {
+        var matchesPrimary = ex.muscle_primary === state.libraryFilterMuscle;
+        var matchesSecondary = (ex.muscles_secondary || []).indexOf(state.libraryFilterMuscle) !== -1;
+        if (!matchesPrimary && !matchesSecondary) return false;
+      }
       if (state.libraryFilterEquipment && ex.equipment !== state.libraryFilterEquipment) return false;
       return true;
     });

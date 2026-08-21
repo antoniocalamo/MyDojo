@@ -1881,10 +1881,13 @@
   function renderVolumeChart() {
     var data = computeSessionVolumes(10);
     if (data.length < 2) {
-      return '<div class="card"><div class="empty" style="padding:16px;">Completa almeno 2 allenamenti per vedere il grafico del volume.</div></div>';
+      return '<div class="card"><div class="empty" style="padding:16px;">Completa almeno 2 allenamenti con peso registrato per vedere il grafico del volume.</div></div>';
     }
     var w = 300, h = 120, padBottom = 20, padTop = 10;
-    var maxVol = Math.max.apply(null, data.map(function (d) { return d.volume; })) || 1;
+    var maxVol = Math.max.apply(null, data.map(function (d) { return d.volume; }));
+    if (maxVol <= 0) {
+      return '<div class="card"><div class="empty" style="padding:16px;">Questi allenamenti non hanno serie con peso e ripetizioni registrati (es. mobilità o circuiti a tempo), quindi non c\'è volume da mostrare.</div></div>';
+    }
     var barGap = 6;
     var barWidth = (w - barGap * (data.length - 1)) / data.length;
     var svg = "";
@@ -1938,13 +1941,16 @@
       '<div class="stat-tile"><span class="num">' + state.stats.hours + '</span><span class="lbl">Ore totali</span></div>' +
     '</div>';
 
-    html += '<h3 class="section-title" style="margin-top:0;">Costanza</h3>';
+    html += '<h3 class="section-title" style="margin-top:0;">Costanza</h3>' +
+      '<p class="page-sub" style="margin:-4px 0 8px;font-size:12.5px;">Un pallino colorato per ogni giorno in cui ti sei allenato, raggruppati per settimana (lun–dom).</p>';
     html += renderHeatmap();
 
-    html += '<h3 class="section-title">Volume nel tempo</h3>';
+    html += '<h3 class="section-title">Volume nel tempo</h3>' +
+      '<p class="page-sub" style="margin:-4px 0 8px;font-size:12.5px;">Ripetizioni × peso sommati per allenamento (solo esercizi con peso registrato).</p>';
     html += renderVolumeChart();
 
-    html += '<h3 class="section-title">Record personali</h3>';
+    html += '<h3 class="section-title">Record personali</h3>' +
+      '<p class="page-sub" style="margin:-4px 0 8px;font-size:12.5px;">Il peso più alto sollevato per ogni esercizio, con data.</p>';
     html += renderPRList();
 
     html += '<h3 class="section-title">Cronologia</h3>';

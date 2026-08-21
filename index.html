@@ -1819,7 +1819,7 @@
     html += '<h2 class="circuit-exname">' + escapeHtml(isRest ? (nextEx ? "Prossimo: " + nextEx.name : "Ultimo esercizio") : current.name) + '</h2>';
 
     if (videoUrl) {
-      html += '<video class="exlib-detail-video" src="' + escapeHtml(videoUrl) + '" autoplay muted loop playsinline preload="auto" style="width:200px;max-height:none;margin:4px auto 0;"></video>';
+      html += '<video class="exlib-detail-video" src="' + escapeHtml(videoUrl) + '" autoplay muted loop playsinline preload="auto"></video>';
     }
 
     if (!isRest && current.instructions) {

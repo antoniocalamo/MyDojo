@@ -413,22 +413,29 @@
   .mascot-badge .mascot-ring { position: absolute; inset: 0; width: 100%; height: 100%; }
   .mascot-badge img { position: relative; z-index: 1; display: block; height: auto; }
   .login-mascot { width: 170px; height: 170px; margin: 0 auto 8px; }
-  header.app-header .header-title { font-size: 17px; font-weight: 800; margin: 0; text-align: center; flex: 1; }
-  header.app-header .profile-btn {
+  header.app-header .header-brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  header.app-header .brand-name { font-size: 15px; font-weight: 800; color: var(--text); white-space: nowrap; }
+  header.app-header .header-greet {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  header.app-header .greet-text { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; }
+  header.app-header .profile-avatar {
     width: 38px;
     height: 38px;
     border-radius: 999px;
     background: var(--surface);
     border: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: var(--text);
+    object-fit: cover;
+    display: block;
     flex-shrink: 0;
   }
-  header.app-header .profile-btn svg { width: 19px; height: 19px; }
-  header.app-header .profile-btn img { width: 26px; height: auto; display: block; }
 
   /* circuito a tempo */
   .circuit-progress { color: var(--text-dim); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin: 4px 0 6px; }
@@ -1117,12 +1124,25 @@
     }
   }
 
+  function displayName() {
+    var email = (state.user && state.user.email) || "";
+    var local = email.split("@")[0] || "";
+    var firstName = local.split(/[.\-_0-9]+/)[0] || local;
+    if (!firstName) return "";
+    return firstName.charAt(0).toUpperCase() + firstName.slice(1);
+  }
+
   function renderScreenHeader(title, view) {
     var mascotSrc = TAB_MASCOTS[view] || MASCOT_HEAD;
     return '<header class="app-header">' +
-      '<span class="logo-mark"><img src="' + mascotSrc + '" alt="' + escapeHtml(title) + '"></span>' +
-      '<h1 class="header-title">' + escapeHtml(title) + '</h1>' +
-      '<button class="profile-btn" data-action="nav" data-view="profile"><img src="' + MASCOT_HEAD + '" alt="Profilo"></button>' +
+      '<div class="header-brand">' +
+        '<span class="logo-mark"><img src="' + mascotSrc + '" alt="' + escapeHtml(title) + '"></span>' +
+        '<span class="brand-name">My Dojo</span>' +
+      '</div>' +
+      '<button class="header-greet" data-action="nav" data-view="profile">' +
+        '<span class="greet-text">Ciao, ' + escapeHtml(displayName()) + '!</span>' +
+        '<img class="profile-avatar" src="' + MASCOT_HEAD + '" alt="Profilo">' +
+      '</button>' +
     '</header>';
   }
 

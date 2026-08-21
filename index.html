@@ -147,6 +147,16 @@
   .hero-card .hero-title { font-size: 19px; font-weight: 800; margin: 0; }
   .hero-card .hero-meta { font-size: 13px; color: var(--text-dim); margin: 2px 0 0; }
   .hero-card.live { box-shadow: 0 0 0 3px var(--cta); }
+  .cat-banner-img {
+    display: block;
+    width: 100%;
+    height: 110px;
+    object-fit: cover;
+    border-radius: var(--radius-lg);
+    margin-bottom: 16px;
+    cursor: pointer;
+    border: 1px solid rgba(40,45,49,0.06);
+  }
 
   .greeting-card {
     display: flex;
@@ -616,9 +626,9 @@
   var WEEKDAY_NAMES = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
 
   var CATEGORIES = [
-    { key: "Forza", emoji: "💪" },
-    { key: "Cardio", emoji: "🔥" },
-    { key: "Stretching", emoji: "🤸" }
+    { key: "Forza", emoji: "💪", banner: "Assets/Categoria Forza.jpg" },
+    { key: "Cardio", emoji: "🔥", banner: "Assets/Categoria Cardio.jpg" },
+    { key: "Stretching", emoji: "🤸", banner: "Assets/Categoria Stretching.jpg" }
   ];
 
   var ADMIN_EMAIL = "antonio.calamo@gmail.com";
@@ -1185,10 +1195,7 @@
     }
 
     CATEGORIES.forEach(function (cat) {
-      html += '<div class="hero-card" style="background:' + gradientFor(cat.key) + ';min-height:110px;" data-action="open-category" data-id="' + escapeHtml(cat.key) + '">' +
-        '<span class="hero-icon">' + cat.emoji + '</span>' +
-        '<p class="hero-title">' + escapeHtml(cat.key) + '</p>' +
-      '</div>';
+      html += '<img class="cat-banner-img" src="' + escapeHtml(cat.banner) + '" alt="' + escapeHtml(cat.key) + '" data-action="open-category" data-id="' + escapeHtml(cat.key) + '">';
     });
 
     html += '<button class="btn btn-ghost" data-action="open-library" style="margin-top:6px;">📚 Libreria esercizi</button>';

@@ -516,15 +516,20 @@
     font-size: 56px;
     margin-bottom: 10px;
   }
-  .exlib-detail-video {
+  .exlib-detail-video-wrap {
     width: 100%;
     max-width: 320px;
     aspect-ratio: 1 / 1;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border);
     margin: 0 auto 10px;
-    display: block;
+    overflow: hidden;
     background: #000;
+  }
+  .exlib-detail-video {
+    width: 100%;
+    height: 100%;
+    display: block;
     object-fit: contain;
   }
 
@@ -1114,7 +1119,8 @@
       v.addEventListener("error", handleVideoError);
       v.addEventListener("loadedmetadata", function () {
         if (this.videoWidth && this.videoHeight) {
-          this.style.aspectRatio = this.videoWidth + " / " + this.videoHeight;
+          var sizeTarget = this.parentNode && this.parentNode.classList.contains("exlib-detail-video-wrap") ? this.parentNode : this;
+          sizeTarget.style.aspectRatio = this.videoWidth + " / " + this.videoHeight;
         }
         if (!this.hasAttribute("autoplay")) this.currentTime = 0.05;
       });
@@ -1660,7 +1666,7 @@
     var ex = state.currentLibraryExercise;
     var html = '<button class="back-btn" data-action="back-to-library">←</button>';
     if (isVideoUrl(ex.image_url)) {
-      html += '<video class="exlib-detail-video" src="' + escapeHtml(ex.image_url) + '" autoplay muted loop playsinline preload="auto"></video>';
+      html += '<div class="exlib-detail-video-wrap"><video class="exlib-detail-video" src="' + escapeHtml(ex.image_url) + '" autoplay muted loop playsinline preload="auto"></video></div>';
     } else {
       html += '<div class="exlib-detail-banner">' + equipmentIcon(ex.equipment) + '</div>';
     }
@@ -1819,7 +1825,7 @@
     html += '<h2 class="circuit-exname">' + escapeHtml(isRest ? (nextEx ? "Prossimo: " + nextEx.name : "Ultimo esercizio") : current.name) + '</h2>';
 
     if (videoUrl) {
-      html += '<video class="exlib-detail-video" src="' + escapeHtml(videoUrl) + '" autoplay muted loop playsinline preload="auto"></video>';
+      html += '<div class="exlib-detail-video-wrap"><video class="exlib-detail-video" src="' + escapeHtml(videoUrl) + '" autoplay muted loop playsinline preload="auto"></video></div>';
     }
 
     if (!isRest && current.instructions) {

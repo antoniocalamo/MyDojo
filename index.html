@@ -147,6 +147,16 @@
   .hero-card .hero-title { font-size: 19px; font-weight: 800; margin: 0; }
   .hero-card .hero-meta { font-size: 13px; color: var(--text-dim); margin: 2px 0 0; }
   .hero-card.live { box-shadow: 0 0 0 3px var(--cta); }
+  .cat-banner-img {
+    display: block;
+    width: 100%;
+    height: 110px;
+    object-fit: cover;
+    border-radius: var(--radius-lg);
+    margin-bottom: 16px;
+    cursor: pointer;
+    border: 1px solid rgba(40,45,49,0.06);
+  }
 
   .greeting-card {
     display: flex;
@@ -252,6 +262,12 @@
   }
   .set-list li .num { color: var(--text-dim); }
   .set-list li .val { font-weight: 700; }
+
+  .heatmap-grid { display: flex; gap: 3px; overflow-x: auto; padding: 2px; }
+  .heatmap-col { display: flex; flex-direction: column; gap: 3px; }
+  .heatmap-cell { width: 11px; height: 11px; border-radius: 3px; background: var(--surface-2); }
+  .heatmap-cell.trained { background: var(--cta); }
+  .heatmap-cell.future { visibility: hidden; }
 
   .set-form { display: flex; gap: 8px; align-items: flex-end; margin-top: 10px; }
   .set-form .field { flex: 1; }
@@ -667,9 +683,9 @@
   var WEEKDAY_NAMES = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
 
   var CATEGORIES = [
-    { key: "Forza", emoji: "💪" },
-    { key: "Cardio", emoji: "🔥" },
-    { key: "Stretching", emoji: "🤸" }
+    { key: "Forza", emoji: "💪", banner: "Assets/Categoria Forza.jpg" },
+    { key: "Cardio", emoji: "🔥", banner: "Assets/Categoria Cardio.jpg" },
+    { key: "Stretching", emoji: "🤸", banner: "Assets/Categoria Stretching.jpg" }
   ];
 
   var ADMIN_EMAIL = "antonio.calamo@gmail.com";
@@ -754,6 +770,7 @@
     flashMessage: null,
     sessionSets: [],
     history: [],
+    statsSets: [],
     historyDetail: null,
     historyDetailSets: [],
     historyDetailExercises: [],
@@ -827,6 +844,15 @@
     var d = new Date(iso);
     return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }) +
       " " + d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+
+  function dateKey(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
+
+  function shortDate(iso) {
+    var d = new Date(iso);
+    return pad2(d.getDate()) + "/" + pad2(d.getMonth() + 1);
   }
 
   function mascotBadge(imgSrc, imgWidthPct) {
@@ -1279,10 +1305,7 @@
     }
 
     CATEGORIES.forEach(function (cat) {
-      html += '<div class="hero-card" style="background:' + gradientFor(cat.key) + ';min-height:110px;" data-action="open-category" data-id="' + escapeHtml(cat.key) + '">' +
-        '<span class="hero-icon">' + cat.emoji + '</span>' +
-        '<p class="hero-title">' + escapeHtml(cat.key) + '</p>' +
-      '</div>';
+      html += '<img class="cat-banner-img" src="' + escapeHtml(cat.banner) + '" alt="' + escapeHtml(cat.key) + '" data-action="open-category" data-id="' + escapeHtml(cat.key) + '">';
     });
 
     html += '<button class="btn btn-ghost" data-action="open-library" style="margin-top:6px;">📚 Libreria esercizi</button>';
@@ -1778,6 +1801,107 @@
     return html;
   }
 
+  function renderHeatmap() {
+    var weeksCount = 12;
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var dow = (today.getDay() + 6) % 7; // 0 = lunedì
+    var startMonday = new Date(today);
+    startMonday.setDate(today.getDate() - dow - (weeksCount - 1) * 7);
+
+    var trainedDays = {};
+    state.history.forEach(function (s) {
+      var d = new Date(s.started_at);
+      d.setHours(0, 0, 0, 0);
+      trainedDays[dateKey(d)] = true;
+    });
+
+    var html = '<div class="heatmap-grid">';
+    for (var col = 0; col < weeksCount; col++) {
+      html += '<div class="heatmap-col">';
+      for (var row = 0; row < 7; row++) {
+        var d = new Date(startMonday);
+        d.setDate(startMonday.getDate() + col * 7 + row);
+        if (d > today) {
+          html += '<div class="heatmap-cell future"></div>';
+        } else {
+          var trained = !!trainedDays[dateKey(d)];
+          html += '<div class="heatmap-cell' + (trained ? ' trained' : '') + '" title="' +
+            d.toLocaleDateString("it-IT") + (trained ? " — allenamento" : "") + '"></div>';
+        }
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    html += '<p style="font-size:11px;color:var(--text-dim);margin:8px 0 0;">Ultime ' + weeksCount + ' settimane</p>';
+    return '<div class="card">' + html + '</div>';
+  }
+
+  function computeSessionVolumes(limit) {
+    var volBySession = {};
+    state.statsSets.forEach(function (st) {
+      var v = (Number(st.reps) || 0) * (Number(st.weight) || 0);
+      volBySession[st.session_id] = (volBySession[st.session_id] || 0) + v;
+    });
+    var finished = state.history.filter(function (s) { return s.finished_at; });
+    var recent = finished.slice(0, limit).reverse();
+    return recent.map(function (s) {
+      return { date: s.started_at, volume: Math.round(volBySession[s.id] || 0) };
+    });
+  }
+
+  function renderVolumeChart() {
+    var data = computeSessionVolumes(10);
+    if (data.length < 2) {
+      return '<div class="card"><div class="empty" style="padding:16px;">Completa almeno 2 allenamenti per vedere il grafico del volume.</div></div>';
+    }
+    var w = 300, h = 120, padBottom = 20, padTop = 10;
+    var maxVol = Math.max.apply(null, data.map(function (d) { return d.volume; })) || 1;
+    var barGap = 6;
+    var barWidth = (w - barGap * (data.length - 1)) / data.length;
+    var svg = "";
+    data.forEach(function (d, i) {
+      var barH = Math.max(2, Math.round((d.volume / maxVol) * (h - padTop - padBottom)));
+      var x = i * (barWidth + barGap);
+      var y = h - padBottom - barH;
+      var label = shortDate(d.date);
+      svg += '<rect x="' + x.toFixed(1) + '" y="' + y + '" width="' + barWidth.toFixed(1) + '" height="' + barH +
+        '" rx="3" style="fill:var(--cta);"><title>' + label + ': ' + d.volume + ' kg</title></rect>';
+      svg += '<text x="' + (x + barWidth / 2).toFixed(1) + '" y="' + (h - 4) +
+        '" font-size="8" text-anchor="middle" style="fill:var(--text-dim);">' + label + '</text>';
+    });
+    return '<div class="card"><svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:120px;overflow:visible;display:block;">' + svg + '</svg></div>';
+  }
+
+  function computePRs() {
+    var best = {};
+    state.statsSets.forEach(function (st) {
+      var w = Number(st.weight) || 0;
+      if (w <= 0) return;
+      if (!best[st.exercise_name] || w > best[st.exercise_name].weight) {
+        best[st.exercise_name] = { exercise: st.exercise_name, weight: w, reps: st.reps, date: st.created_at };
+      }
+    });
+    var list = [];
+    for (var k in best) { if (best.hasOwnProperty(k)) list.push(best[k]); }
+    list.sort(function (a, b) { return b.weight - a.weight; });
+    return list;
+  }
+
+  function renderPRList() {
+    var prs = computePRs();
+    if (prs.length === 0) {
+      return '<div class="card"><div class="empty" style="padding:16px;">Ancora nessun record da mostrare.</div></div>';
+    }
+    var html = '<div class="card"><ul class="set-list">';
+    prs.forEach(function (p) {
+      html += '<li><span class="num">' + escapeHtml(p.exercise) + '</span><span class="val">' +
+        p.weight + ' kg × ' + p.reps + ' rip. · ' + shortDate(p.date) + '</span></li>';
+    });
+    html += '</ul></div>';
+    return html;
+  }
+
   function renderHistory() {
     var html = '<p class="page-sub" style="margin-top:2px;">I tuoi allenamenti passati</p>';
 
@@ -1786,6 +1910,16 @@
       '<div class="stat-tile"><span class="num">' + state.stats.hours + '</span><span class="lbl">Ore totali</span></div>' +
     '</div>';
 
+    html += '<h3 class="section-title" style="margin-top:0;">Costanza</h3>';
+    html += renderHeatmap();
+
+    html += '<h3 class="section-title">Volume nel tempo</h3>';
+    html += renderVolumeChart();
+
+    html += '<h3 class="section-title">Record personali</h3>';
+    html += renderPRList();
+
+    html += '<h3 class="section-title">Cronologia</h3>';
     if (state.history.length === 0) {
       html += '<div class="empty">Nessun allenamento registrato ancora.</div>';
     } else {
@@ -2071,6 +2205,14 @@
           if (s.finished_at) totalMs += new Date(s.finished_at) - new Date(s.started_at);
         });
         state.stats = { count: count, hours: Math.round((totalMs / 3600000) * 10) / 10 };
+      });
+  }
+
+  function loadStatsSets() {
+    return sb.from("session_sets").select("session_id, exercise_name, reps, weight, created_at")
+      .then(function (res) {
+        if (res.error) throw res.error;
+        state.statsSets = res.data;
       });
   }
 
@@ -2400,7 +2542,7 @@
   function openHistory() {
     withBusy(function () {
       state.authError = "";
-      return loadHistory().then(function () { state.view = "history"; });
+      return Promise.all([loadHistory(), loadStatsSets()]).then(function () { state.view = "history"; });
     });
   }
 
@@ -2420,7 +2562,7 @@
       state.authError = "";
       return sb.from("workout_sessions").delete().eq("id", id).then(function (res) {
         if (res.error) throw res.error;
-        return loadHistory();
+        return Promise.all([loadHistory(), loadStatsSets()]);
       }).then(function () {
         state.view = "history";
       });

@@ -147,6 +147,16 @@
   .hero-card .hero-title { font-size: 19px; font-weight: 800; margin: 0; }
   .hero-card .hero-meta { font-size: 13px; color: var(--text-dim); margin: 2px 0 0; }
   .hero-card.live { box-shadow: 0 0 0 3px var(--cta); }
+  .cat-banner-img {
+    display: block;
+    width: 100%;
+    height: 110px;
+    object-fit: cover;
+    border-radius: var(--radius-lg);
+    margin-bottom: 16px;
+    cursor: pointer;
+    border: 1px solid rgba(40,45,49,0.06);
+  }
 
   .greeting-card {
     display: flex;
@@ -177,6 +187,28 @@
     margin: 0 0 14px;
     padding: 0 4px;
   }
+
+  .plan-top-row { display: flex; align-items: stretch; gap: 10px; margin-bottom: 10px; }
+  .plan-top-row .greeting-card { flex: 1; min-width: 0; margin-bottom: 0; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px; }
+  .plan-top-row .greeting-card .mascot-badge { width: 32px; height: 32px; }
+  .plan-top-row .greeting-card .greeting-msg { font-size: 12px; line-height: 1.25; }
+  .plan-top-row .greeting-card .greeting-streak { font-size: 10px; padding: 2px 7px; margin-top: 4px; }
+  .plan-action-card {
+    flex: 1;
+    min-width: 0;
+    border-radius: var(--radius-lg);
+    padding: 12px;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    cursor: pointer;
+    border: 1px solid rgba(40,45,49,0.06);
+  }
+  .plan-action-card.live { box-shadow: 0 0 0 2px var(--cta); }
+  .plan-action-card .tag { font-size: 10px; padding: 3px 8px; width: fit-content; margin-bottom: 5px; }
+  .plan-action-card .action-title { font-size: 13px; font-weight: 800; margin: 0; }
+  .plan-action-card .action-meta { font-size: 10.5px; color: var(--text-dim); margin: 3px 0 0; line-height: 1.25; }
 
   .tag {
     display: inline-block;
@@ -252,6 +284,12 @@
   }
   .set-list li .num { color: var(--text-dim); }
   .set-list li .val { font-weight: 700; }
+
+  .heatmap-grid { display: flex; gap: 3px; overflow-x: auto; padding: 2px; }
+  .heatmap-col { display: flex; flex-direction: column; gap: 3px; }
+  .heatmap-cell { width: 11px; height: 11px; border-radius: 3px; background: var(--surface-2); }
+  .heatmap-cell.trained { background: var(--cta); }
+  .heatmap-cell.future { visibility: hidden; }
 
   .set-form { display: flex; gap: 8px; align-items: flex-end; margin-top: 10px; }
   .set-form .field { flex: 1; }
@@ -569,6 +607,63 @@
   }
   .toggle-switch.on { background: var(--accent); }
   .toggle-switch.on::after { transform: translateX(20px); }
+
+  /* sezione Mente */
+  .breath-wrap { display: flex; flex-direction: column; align-items: center; padding: 18px 0 8px; }
+  .breath-circle {
+    width: 190px;
+    height: 190px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #f9e0cb, #f1a39f);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-ink);
+    transform: scale(0.62);
+    box-shadow: 0 8px 24px rgba(241,163,159,0.35);
+  }
+  .breath-circle .breath-phase { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .breath-circle .breath-seconds { font-size: 40px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .breath-cycles { color: var(--text-dim); font-size: 13px; margin: 18px 0 4px; }
+  .breath-idle-hint { color: var(--text-dim); font-size: 13px; text-align: center; max-width: 260px; margin: 14px auto 0; }
+
+  .meditation-wrap { display: flex; flex-direction: column; align-items: center; padding: 12px 0 8px; }
+  .meditation-timer { font-size: 44px; font-weight: 800; font-variant-numeric: tabular-nums; margin: 10px 0 18px; }
+  .meditation-line {
+    min-height: 66px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    max-width: 300px;
+    padding: 0 10px;
+    animation: meditation-fade 1.2s ease;
+  }
+  @keyframes meditation-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .meditation-done { font-size: 15px; font-weight: 700; color: var(--ok); margin-top: 6px; }
+
+  .mood-face-row { display: flex; justify-content: space-between; gap: 8px; margin: 4px 0 16px; }
+  .mood-face {
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 0;
+    font-size: 26px;
+    cursor: pointer;
+  }
+  .mood-face.selected { background: var(--accent); border-color: var(--accent); }
+  .mood-today-badge { display: inline-block; background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 700; margin-bottom: 10px; }
+  .mood-sparkline { width: 100%; height: 54px; margin: 4px 0 18px; }
+  .mood-entry-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .mood-entry-row:last-child { border-bottom: none; }
+  .mood-entry-emoji { font-size: 22px; flex-shrink: 0; }
+  .mood-entry-date { font-size: 12px; color: var(--text-dim); font-weight: 700; min-width: 62px; }
+  .mood-entry-note { font-size: 13px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -623,12 +718,54 @@
   var WEEKDAY_NAMES = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
 
   var CATEGORIES = [
-    { key: "Forza", emoji: "💪" },
-    { key: "Cardio", emoji: "🔥" },
-    { key: "Stretching", emoji: "🤸" }
+    { key: "Forza", emoji: "💪", banner: "Assets/Categoria Forza.jpg" },
+    { key: "Cardio", emoji: "🔥", banner: "Assets/Categoria Cardio.jpg" },
+    { key: "Stretching", emoji: "🤸", banner: "Assets/Categoria Stretching.jpg" }
   ];
 
   var ADMIN_EMAIL = "antonio.calamo@gmail.com";
+
+  var BREATH_TECHNIQUES = {
+    box: {
+      label: "Box breathing",
+      phases: [
+        { name: "Inspira", key: "in", secs: 4 },
+        { name: "Trattieni", key: "hold", secs: 4 },
+        { name: "Espira", key: "out", secs: 4 },
+        { name: "Trattieni", key: "hold", secs: 4 }
+      ]
+    },
+    "478": {
+      label: "4-7-8",
+      phases: [
+        { name: "Inspira", key: "in", secs: 4 },
+        { name: "Trattieni", key: "hold", secs: 7 },
+        { name: "Espira", key: "out", secs: 8 }
+      ]
+    }
+  };
+
+  var MEDITATION_DURATIONS = [3, 5, 10];
+
+  var MEDITATION_LINES = [
+    "Chiudi gli occhi e trova una posizione comoda.",
+    "Porta l'attenzione al tuo respiro, senza forzarlo.",
+    "Lascia andare la tensione dalle spalle e dalla mascella.",
+    "Se la mente vaga, riportala dolcemente al respiro.",
+    "Senti il corpo che si appoggia, respiro dopo respiro.",
+    "Non c'è nulla da fare, solo essere qui ora.",
+    "Osserva i pensieri passare, senza seguirli.",
+    "Ancora qualche respiro tranquillo.",
+    "Quando sei pronto, riporta l'attenzione alla stanza."
+  ];
+
+  var MOOD_FACES = ["😞", "🙁", "😐", "🙂", "😄"];
+
+  function todayIso() {
+    var d = new Date();
+    var pad = function (n) { return n < 10 ? "0" + n : "" + n; };
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
 
   var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -668,6 +805,7 @@
     flashMessage: null,
     sessionSets: [],
     history: [],
+    statsSets: [],
     historyDetail: null,
     historyDetailSets: [],
     historyDetailExercises: [],
@@ -684,7 +822,12 @@
     workoutStartOptions: { warmup: false, silent: false },
     circuit: null,
     stats: { count: 0, hours: 0 },
-    busy: false
+    busy: false,
+    benessereTab: "respiro",
+    breathing: null,
+    meditation: null,
+    moodEntries: [],
+    moodDraft: { mood: null, note: "" }
   };
 
   try {
@@ -696,6 +839,8 @@
   var app = document.getElementById("app");
   var workoutTimerHandle = null;
   var circuitTimerHandle = null;
+  var breathingTimerHandle = null;
+  var meditationTimerHandle = null;
   var audioCtx = null;
 
   function beep(freq, durMs) {
@@ -734,6 +879,15 @@
     var d = new Date(iso);
     return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }) +
       " " + d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+
+  function dateKey(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
+
+  function shortDate(iso) {
+    var d = new Date(iso);
+    return pad2(d.getDate()) + "/" + pad2(d.getMonth() + 1);
   }
 
   function mascotBadge(imgSrc, imgWidthPct) {
@@ -863,6 +1017,10 @@
 
   function render() {
     if (state.view !== "workout") { stopWorkoutTimer(); stopCircuitTimer(); }
+    if (state.view !== "benessere") {
+      stopBreathingTimer(); state.breathing = null;
+      stopMeditationTimer(); state.meditation = null;
+    }
 
     if (state.view === "loading") {
       app.innerHTML = '<div class="empty">Caricamento...</div>';
@@ -898,6 +1056,8 @@
     else if (state.view === "planMessagesAdmin") body = renderPlanMessagesAdmin();
     else body = renderHome();
 
+    var pillScrollPositions = Array.prototype.map.call(app.querySelectorAll(".pill-row"), function (el) { return el.scrollLeft; });
+
     app.innerHTML =
       (showNav ? renderScreenHeader(tabTitles[state.view], state.view) : "") +
       '<main class="screen">' +
@@ -906,6 +1066,10 @@
         body +
       '</main>' +
       (showNav ? renderBottomNav() : "");
+
+    Array.prototype.forEach.call(app.querySelectorAll(".pill-row"), function (el, i) {
+      if (pillScrollPositions[i] != null) el.scrollLeft = pillScrollPositions[i];
+    });
 
     if (state.view === "workout" && state.activeSession) {
       startWorkoutTimer(state.activeSession.started_at);
@@ -1063,29 +1227,31 @@
     return list[idx].text;
   }
 
-  function renderPlanGreeting() {
+  function renderPlanGreeting(compact) {
     var trainedToday = hasTrainedToday();
     var streak = computeStreak();
     var activeMessages = state.dashboardMessages.filter(function (m) { return m.active; });
     var pool = activeMessages.filter(function (m) { return m.kind === (trainedToday ? "greeting_done" : "greeting_pending"); });
     var greeting = pickDailyMessage(pool) || (trainedToday ? "Allenamento di oggi fatto! Sei un vero guerriero 🎉" : "Pronto per allenarti oggi?");
     greeting = greeting.replace(/\{streak\}/g, streak);
-    var tip = pickDailyMessage(activeMessages.filter(function (m) { return m.kind === "tip"; }));
 
-    var html = '<div class="greeting-card">' +
-      mascotBadge(MASCOT_HEAD, 76) +
+    return '<div class="greeting-card">' +
+      mascotBadge(MASCOT_HEAD, compact ? 60 : 76) +
       '<div class="greeting-text">' +
         '<p class="greeting-msg">' + escapeHtml(greeting) + '</p>' +
         (streak > 0 ? '<span class="greeting-streak">🔥 ' + streak + ' giorni di fila</span>' : '') +
       '</div>' +
     '</div>';
-    if (tip) html += '<p class="greeting-tip">💡 ' + escapeHtml(tip) + '</p>';
-    return html;
+  }
+
+  function renderPlanTip() {
+    var activeMessages = state.dashboardMessages.filter(function (m) { return m.active; });
+    var tip = pickDailyMessage(activeMessages.filter(function (m) { return m.kind === "tip"; }));
+    return tip ? '<p class="greeting-tip">💡 ' + escapeHtml(tip) + '</p>' : '';
   }
 
   function renderPlan() {
     var todayIdx = currentWeekdayIndex();
-    var html = renderPlanGreeting();
 
     var assignedCount = 0, completedCount = 0, missedDay = null;
     var dayEntries = WEEKDAY_NAMES.map(function (name, idx) {
@@ -1100,25 +1266,29 @@
       return { name: name, idx: idx, tpl: tpl, done: done };
     });
 
+    var actionCard = "";
+    if (state.activeSession) {
+      actionCard = '<div class="plan-action-card live" style="background:' + gradientFor(state.activeSession.template_id || state.activeSession.id) + ';" data-action="resume-session">' +
+        '<span class="tag tag-solid">🏋️ In corso</span>' +
+        '<p class="action-title">' + escapeHtml(state.activeSession.template_name) + '</p>' +
+        '<p class="action-meta">Iniziato il ' + formatDate(state.activeSession.started_at) + ' — tocca per riprendere</p>' +
+      '</div>';
+    } else if (missedDay) {
+      actionCard = '<div class="plan-action-card" style="background:' + gradientFor(missedDay.tpl.id) + ';" data-action="start-session" data-id="' + missedDay.tpl.id + '">' +
+        '<span class="tag tag-solid">⏱️ Recupero</span>' +
+        '<p class="action-title">' + escapeHtml(missedDay.tpl.name) + '</p>' +
+        '<p class="action-meta">Saltato ' + missedDay.name + ' — tocca per recuperarlo</p>' +
+      '</div>';
+    }
+
+    var html = actionCard
+      ? '<div class="plan-top-row">' + renderPlanGreeting(true) + actionCard + '</div>'
+      : renderPlanGreeting(false);
+    html += renderPlanTip();
+
     html += '<p class="page-sub" style="margin-top:2px;">' +
       (assignedCount > 0 ? completedCount + ' di ' + assignedCount + ' allenamenti fatti questa settimana' : 'La tua settimana tipo') +
     '</p>';
-
-    if (state.activeSession) {
-      html += '<div class="hero-card live" style="background:' + gradientFor(state.activeSession.template_id || state.activeSession.id) + ';" data-action="resume-session">' +
-        '<span class="hero-icon">🏋️</span>' +
-        '<span class="tag tag-solid" style="width:fit-content;margin-bottom:8px;">In corso</span>' +
-        '<p class="hero-title">' + escapeHtml(state.activeSession.template_name) + '</p>' +
-        '<p class="hero-meta">Iniziato il ' + formatDate(state.activeSession.started_at) + ' — tocca per riprendere</p>' +
-      '</div>';
-    } else if (missedDay) {
-      html += '<div class="hero-card" style="background:' + gradientFor(missedDay.tpl.id) + ';" data-action="start-session" data-id="' + missedDay.tpl.id + '">' +
-        '<span class="hero-icon">⏱️</span>' +
-        '<span class="tag tag-solid" style="width:fit-content;margin-bottom:8px;">Recupero</span>' +
-        '<p class="hero-title">' + escapeHtml(missedDay.tpl.name) + '</p>' +
-        '<p class="hero-meta">Saltato ' + missedDay.name + ' — tocca per recuperarlo oggi</p>' +
-      '</div>';
-    }
 
     dayEntries.forEach(function (d) {
       var isToday = d.idx === todayIdx;
@@ -1183,10 +1353,7 @@
     }
 
     CATEGORIES.forEach(function (cat) {
-      html += '<div class="hero-card" style="background:' + gradientFor(cat.key) + ';min-height:110px;" data-action="open-category" data-id="' + escapeHtml(cat.key) + '">' +
-        '<span class="hero-icon">' + cat.emoji + '</span>' +
-        '<p class="hero-title">' + escapeHtml(cat.key) + '</p>' +
-      '</div>';
+      html += '<img class="cat-banner-img" src="' + escapeHtml(cat.banner) + '" alt="' + escapeHtml(cat.key) + '" data-action="open-category" data-id="' + escapeHtml(cat.key) + '">';
     });
 
     html += '<button class="btn btn-ghost" data-action="open-library" style="margin-top:6px;">📚 Libreria esercizi</button>';
@@ -1682,6 +1849,110 @@
     return html;
   }
 
+  function renderHeatmap() {
+    var weeksCount = 12;
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var dow = (today.getDay() + 6) % 7; // 0 = lunedì
+    var startMonday = new Date(today);
+    startMonday.setDate(today.getDate() - dow - (weeksCount - 1) * 7);
+
+    var trainedDays = {};
+    state.history.forEach(function (s) {
+      var d = new Date(s.started_at);
+      d.setHours(0, 0, 0, 0);
+      trainedDays[dateKey(d)] = true;
+    });
+
+    var html = '<div class="heatmap-grid">';
+    for (var col = 0; col < weeksCount; col++) {
+      html += '<div class="heatmap-col">';
+      for (var row = 0; row < 7; row++) {
+        var d = new Date(startMonday);
+        d.setDate(startMonday.getDate() + col * 7 + row);
+        if (d > today) {
+          html += '<div class="heatmap-cell future"></div>';
+        } else {
+          var trained = !!trainedDays[dateKey(d)];
+          html += '<div class="heatmap-cell' + (trained ? ' trained' : '') + '" title="' +
+            d.toLocaleDateString("it-IT") + (trained ? " — allenamento" : "") + '"></div>';
+        }
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    html += '<p style="font-size:11px;color:var(--text-dim);margin:8px 0 0;">Ultime ' + weeksCount + ' settimane</p>';
+    return '<div class="card">' + html + '</div>';
+  }
+
+  function computeSessionVolumes(limit) {
+    var volBySession = {};
+    state.statsSets.forEach(function (st) {
+      var v = (Number(st.reps) || 0) * (Number(st.weight) || 0);
+      volBySession[st.session_id] = (volBySession[st.session_id] || 0) + v;
+    });
+    var finished = state.history.filter(function (s) { return s.finished_at; });
+    var recent = finished.slice(0, limit).reverse();
+    return recent.map(function (s) {
+      return { date: s.started_at, volume: Math.round(volBySession[s.id] || 0) };
+    });
+  }
+
+  function renderVolumeChart() {
+    var data = computeSessionVolumes(10);
+    if (data.length < 2) {
+      return '<div class="card"><div class="empty" style="padding:16px;">Completa almeno 2 allenamenti con peso registrato per vedere il grafico del volume.</div></div>';
+    }
+    var w = 300, h = 120, padBottom = 20, padTop = 10;
+    var maxVol = Math.max.apply(null, data.map(function (d) { return d.volume; }));
+    if (maxVol <= 0) {
+      return '<div class="card"><div class="empty" style="padding:16px;">Questi allenamenti non hanno serie con peso e ripetizioni registrati (es. mobilità o circuiti a tempo), quindi non c\'è volume da mostrare.</div></div>';
+    }
+    var barGap = 6;
+    var barWidth = (w - barGap * (data.length - 1)) / data.length;
+    var svg = "";
+    data.forEach(function (d, i) {
+      var barH = Math.max(2, Math.round((d.volume / maxVol) * (h - padTop - padBottom)));
+      var x = i * (barWidth + barGap);
+      var y = h - padBottom - barH;
+      var label = shortDate(d.date);
+      svg += '<rect x="' + x.toFixed(1) + '" y="' + y + '" width="' + barWidth.toFixed(1) + '" height="' + barH +
+        '" rx="3" style="fill:var(--cta);"><title>' + label + ': ' + d.volume + ' kg</title></rect>';
+      svg += '<text x="' + (x + barWidth / 2).toFixed(1) + '" y="' + (h - 4) +
+        '" font-size="8" text-anchor="middle" style="fill:var(--text-dim);">' + label + '</text>';
+    });
+    return '<div class="card"><svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:120px;overflow:visible;display:block;">' + svg + '</svg></div>';
+  }
+
+  function computePRs() {
+    var best = {};
+    state.statsSets.forEach(function (st) {
+      var w = Number(st.weight) || 0;
+      if (w <= 0) return;
+      if (!best[st.exercise_name] || w > best[st.exercise_name].weight) {
+        best[st.exercise_name] = { exercise: st.exercise_name, weight: w, reps: st.reps, date: st.created_at };
+      }
+    });
+    var list = [];
+    for (var k in best) { if (best.hasOwnProperty(k)) list.push(best[k]); }
+    list.sort(function (a, b) { return b.weight - a.weight; });
+    return list;
+  }
+
+  function renderPRList() {
+    var prs = computePRs();
+    if (prs.length === 0) {
+      return '<div class="card"><div class="empty" style="padding:16px;">Ancora nessun record da mostrare.</div></div>';
+    }
+    var html = '<div class="card"><ul class="set-list">';
+    prs.forEach(function (p) {
+      html += '<li><span class="num">' + escapeHtml(p.exercise) + '</span><span class="val">' +
+        p.weight + ' kg × ' + p.reps + ' rip. · ' + shortDate(p.date) + '</span></li>';
+    });
+    html += '</ul></div>';
+    return html;
+  }
+
   function renderHistory() {
     var html = '<p class="page-sub" style="margin-top:2px;">I tuoi allenamenti passati</p>';
 
@@ -1690,6 +1961,19 @@
       '<div class="stat-tile"><span class="num">' + state.stats.hours + '</span><span class="lbl">Ore totali</span></div>' +
     '</div>';
 
+    html += '<h3 class="section-title" style="margin-top:0;">Costanza</h3>' +
+      '<p class="page-sub" style="margin:-4px 0 8px;font-size:12.5px;">Un pallino colorato per ogni giorno in cui ti sei allenato, raggruppati per settimana (lun–dom).</p>';
+    html += renderHeatmap();
+
+    html += '<h3 class="section-title">Volume nel tempo</h3>' +
+      '<p class="page-sub" style="margin:-4px 0 8px;font-size:12.5px;">Ripetizioni × peso sommati per allenamento (solo esercizi con peso registrato).</p>';
+    html += renderVolumeChart();
+
+    html += '<h3 class="section-title">Record personali</h3>' +
+      '<p class="page-sub" style="margin:-4px 0 8px;font-size:12.5px;">Il peso più alto sollevato per ogni esercizio, con data.</p>';
+    html += renderPRList();
+
+    html += '<h3 class="section-title">Cronologia</h3>';
     if (state.history.length === 0) {
       html += '<div class="empty">Nessun allenamento registrato ancora.</div>';
     } else {
@@ -1747,13 +2031,143 @@
     return html;
   }
 
+  function benessereTabPill(key, label) {
+    var active = state.benessereTab === key;
+    return '<button class="pill' + (active ? " active" : "") + '" data-action="benessere-tab" data-value="' + key + '">' + label + '</button>';
+  }
+
   function renderBenessere() {
-    return '<p class="page-sub" style="margin-top:2px;">Yoga, mindfulness, respirazione</p>' +
-      '<div class="empty" style="padding-top:60px;">' +
-        '<div style="font-size:48px;margin-bottom:12px;">🧘</div>' +
-        '<p style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 6px;">Presto disponibile</p>' +
-        '<p style="max-width:280px;margin:0 auto;">Questa sezione sarà dedicata al tuo equilibrio mentale: esercizi di respirazione, meditazione guidata e stretching. Arriva in un prossimo aggiornamento.</p>' +
+    var html = '<p class="page-sub" style="margin-top:2px;">Respira, medita, osserva come ti senti</p>';
+    html += '<div class="pill-row">' +
+      benessereTabPill("respiro", "🫁 Respiro") +
+      benessereTabPill("meditazione", "🧘 Meditazione") +
+      benessereTabPill("diario", "📔 Diario") +
+    '</div>';
+    if (state.benessereTab === "meditazione") html += renderMeditationTab();
+    else if (state.benessereTab === "diario") html += renderMoodDiaryTab();
+    else html += renderBreathingTab();
+    return html;
+  }
+
+  // ---------- respiro ----------
+
+  function renderBreathingTab() {
+    var b = state.breathing;
+    var html = '';
+    if (!b) {
+      html += '<div class="pill-row">';
+      Object.keys(BREATH_TECHNIQUES).forEach(function (key) {
+        html += '<button class="pill" data-action="start-breathing" data-value="' + key + '">' + BREATH_TECHNIQUES[key].label + '</button>';
+      });
+      html += '</div>';
+      html += '<div class="breath-wrap"><div class="breath-circle"><span class="breath-phase">Pronto?</span></div></div>';
+      html += '<p class="breath-idle-hint">Scegli una tecnica per iniziare. Segui il cerchio: si espande quando inspiri, si ferma quando trattieni, si restringe quando espiri.</p>';
+    } else {
+      var phase = BREATH_TECHNIQUES[b.technique].phases[b.phaseIndex];
+      html += '<div class="breath-wrap">' +
+        '<div class="breath-circle" id="breath-circle"><span class="breath-phase" id="breath-phase">' + phase.name + '</span><span class="breath-seconds" id="breath-seconds">' + b.secondsLeft + '</span></div>' +
+        '<div class="breath-cycles">Cicli completati: <b id="breath-cycles">' + b.cycles + '</b></div>' +
+        '<button class="btn btn-ghost btn-small" data-action="stop-breathing">Interrompi</button>' +
       '</div>';
+    }
+    return html;
+  }
+
+  // ---------- meditazione ----------
+
+  function renderMeditationTab() {
+    var m = state.meditation;
+    var html = '';
+    if (!m) {
+      html += '<div class="pill-row">';
+      MEDITATION_DURATIONS.forEach(function (mins) {
+        html += '<button class="pill" data-action="start-meditation" data-value="' + mins + '">' + mins + ' min</button>';
+      });
+      html += '</div>';
+      html += '<div class="empty" style="padding-top:40px;">' +
+        '<div style="font-size:40px;margin-bottom:10px;">🕊️</div>' +
+        '<p style="max-width:260px;margin:0 auto;">Scegli quanto tempo vuoi dedicare a te. Ti accompagno con qualche frase, poi solo silenzio e respiro.</p>' +
+      '</div>';
+    } else if (m.done) {
+      html += '<div class="meditation-wrap">' +
+        '<div style="font-size:40px;margin-bottom:6px;">🙏</div>' +
+        '<p class="meditation-done">Sessione completata, ben fatto.</p>' +
+        '<button class="btn btn-ghost btn-small" style="margin-top:14px;" data-action="stop-meditation">Chiudi</button>' +
+      '</div>';
+    } else {
+      html += '<div class="meditation-wrap">' +
+        '<div class="meditation-timer" id="meditation-timer">' + formatMeditationTime(m.secondsLeft) + '</div>' +
+        '<div class="meditation-line" id="meditation-line">' + escapeHtml(MEDITATION_LINES[m.lineIndex]) + '</div>' +
+        '<button class="btn btn-ghost btn-small" style="margin-top:18px;" data-action="stop-meditation">Interrompi</button>' +
+      '</div>';
+    }
+    return html;
+  }
+
+  function formatMeditationTime(secs) {
+    var m = Math.floor(secs / 60);
+    var s = secs % 60;
+    return m + ":" + (s < 10 ? "0" + s : s);
+  }
+
+  // ---------- diario dell'umore ----------
+
+  function renderMoodDiaryTab() {
+    var today = todayIso();
+    var todayEntry = state.moodEntries.filter(function (e) { return e.entry_date === today; })[0] || null;
+    var selectedMood = state.moodDraft.mood != null ? state.moodDraft.mood : (todayEntry ? todayEntry.mood : null);
+    var html = '';
+    if (todayEntry) html += '<div class="mood-today-badge">✓ Hai già registrato l\'umore di oggi</div>';
+    html += '<form data-action="save-mood">';
+    html += '<input type="hidden" name="mood" value="' + (selectedMood || "") + '">';
+    html += '<label>Come ti senti oggi?</label>';
+    html += '<div class="mood-face-row">';
+    MOOD_FACES.forEach(function (face, i) {
+      var val = i + 1;
+      html += '<button type="button" class="mood-face' + (selectedMood === val ? " selected" : "") + '" data-action="set-mood-value" data-value="' + val + '">' + face + '</button>';
+    });
+    html += '</div>';
+    html += '<textarea name="note" rows="2" placeholder="Una nota veloce (facoltativa)">' + escapeHtml(state.moodDraft.note || (todayEntry ? todayEntry.note || "" : "")) + '</textarea>';
+    html += '<button type="submit" class="btn btn-accent" ' + (selectedMood ? "" : "disabled") + '>Salva</button>';
+    html += '</form>';
+
+    if (state.moodEntries.length > 0) {
+      html += '<h3 class="section-title">Ultimi giorni</h3>';
+      html += renderMoodSparkline();
+      html += '<div>';
+      state.moodEntries.slice(0, 14).forEach(function (e) {
+        var d = new Date(e.entry_date + "T00:00:00");
+        var label = d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
+        html += '<div class="mood-entry-row">' +
+          '<span class="mood-entry-date">' + label + '</span>' +
+          '<span class="mood-entry-emoji">' + MOOD_FACES[e.mood - 1] + '</span>' +
+          '<span class="mood-entry-note">' + escapeHtml(e.note || "") + '</span>' +
+        '</div>';
+      });
+      html += '</div>';
+    }
+    return html;
+  }
+
+  function renderMoodSparkline() {
+    var entries = state.moodEntries.slice(0, 14).slice().reverse();
+    if (entries.length < 2) return "";
+    var w = 280, h = 44, pad = 6;
+    var step = (w - pad * 2) / (entries.length - 1);
+    var points = entries.map(function (e, i) {
+      var x = pad + i * step;
+      var y = pad + (h - pad * 2) * (1 - (e.mood - 1) / 4);
+      return x.toFixed(1) + "," + y.toFixed(1);
+    });
+    var dots = entries.map(function (e, i) {
+      var x = pad + i * step;
+      var y = pad + (h - pad * 2) * (1 - (e.mood - 1) / 4);
+      return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="2.6" fill="#f1a39f"></circle>';
+    }).join("");
+    return '<svg class="mood-sparkline" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+      '<polyline points="' + points.join(" ") + '" fill="none" stroke="#f1a39f" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>' +
+      dots +
+    '</svg>';
   }
 
   function renderProfile() {
@@ -1845,6 +2259,14 @@
           if (s.finished_at) totalMs += new Date(s.finished_at) - new Date(s.started_at);
         });
         state.stats = { count: count, hours: Math.round((totalMs / 3600000) * 10) / 10 };
+      });
+  }
+
+  function loadStatsSets() {
+    return sb.from("session_sets").select("session_id, exercise_name, reps, weight, created_at")
+      .then(function (res) {
+        if (res.error) throw res.error;
+        state.statsSets = res.data;
       });
   }
 
@@ -2174,7 +2596,7 @@
   function openHistory() {
     withBusy(function () {
       state.authError = "";
-      return loadHistory().then(function () { state.view = "history"; });
+      return Promise.all([loadHistory(), loadStatsSets()]).then(function () { state.view = "history"; });
     });
   }
 
@@ -2194,7 +2616,7 @@
       state.authError = "";
       return sb.from("workout_sessions").delete().eq("id", id).then(function (res) {
         if (res.error) throw res.error;
-        return loadHistory();
+        return Promise.all([loadHistory(), loadStatsSets()]);
       }).then(function () {
         state.view = "history";
       });
@@ -2222,8 +2644,152 @@
 
   function openBenessere() {
     state.authError = "";
-    state.view = "benessere";
+    withBusy(function () {
+      return loadMoodEntries().then(function () {
+        state.view = "benessere";
+      });
+    });
+  }
+
+  function loadMoodEntries() {
+    return sb.from("mood_entries").select("*").order("entry_date", { ascending: false }).limit(30).then(function (res) {
+      if (res.error) throw res.error;
+      state.moodEntries = res.data;
+    });
+  }
+
+  function saveMood(mood, note) {
+    withBusy(function () {
+      state.authError = "";
+      return sb.from("mood_entries").upsert({
+        user_id: state.user.id,
+        entry_date: todayIso(),
+        mood: mood,
+        note: note || null
+      }, { onConflict: "user_id,entry_date" }).then(function (res) {
+        if (res.error) throw res.error;
+        state.moodDraft = { mood: null, note: "" };
+        return loadMoodEntries();
+      }).then(function () {
+        showFlash("Umore salvato");
+      });
+    });
+  }
+
+  function stopBreathingTimer() {
+    if (breathingTimerHandle) { clearInterval(breathingTimerHandle); breathingTimerHandle = null; }
+  }
+
+  function applyBreathCircleTransform(phase) {
+    var circle = document.getElementById("breath-circle");
+    if (!circle) return;
+    if (phase.key === "in") {
+      circle.style.transition = "transform " + phase.secs + "s ease-in-out";
+      circle.style.transform = "scale(1.15)";
+    } else if (phase.key === "out") {
+      circle.style.transition = "transform " + phase.secs + "s ease-in-out";
+      circle.style.transform = "scale(0.62)";
+    }
+  }
+
+  function startBreathing(techniqueKey) {
+    if (!BREATH_TECHNIQUES[techniqueKey]) return;
+    stopBreathingTimer();
+    var phases = BREATH_TECHNIQUES[techniqueKey].phases;
+    state.breathing = { technique: techniqueKey, phaseIndex: 0, secondsLeft: phases[0].secs, cycles: 0 };
     render();
+    var circle = document.getElementById("breath-circle");
+    if (circle) {
+      circle.style.transition = "none";
+      circle.style.transform = "scale(0.62)";
+      void circle.offsetWidth; // forza il browser a "fissare" lo stato di partenza prima di animare
+    }
+    requestAnimationFrame(function () { applyBreathCircleTransform(phases[0]); });
+    breathingTimerHandle = setInterval(tickBreathing, 1000);
+  }
+
+  function stopBreathing() {
+    stopBreathingTimer();
+    state.breathing = null;
+    render();
+  }
+
+  function advanceBreathPhase() {
+    var b = state.breathing;
+    var phases = BREATH_TECHNIQUES[b.technique].phases;
+    b.phaseIndex += 1;
+    if (b.phaseIndex >= phases.length) {
+      b.phaseIndex = 0;
+      b.cycles += 1;
+    }
+    var phase = phases[b.phaseIndex];
+    b.secondsLeft = phase.secs;
+    beep(phase.key === "in" ? 520 : phase.key === "out" ? 400 : 460, 90);
+    vibrate(60);
+    var phaseEl = document.getElementById("breath-phase");
+    var secEl = document.getElementById("breath-seconds");
+    var cyclesEl = document.getElementById("breath-cycles");
+    if (phaseEl) phaseEl.textContent = phase.name;
+    if (secEl) secEl.textContent = b.secondsLeft;
+    if (cyclesEl) cyclesEl.textContent = b.cycles;
+    applyBreathCircleTransform(phase);
+  }
+
+  function tickBreathing() {
+    var b = state.breathing;
+    var secEl = document.getElementById("breath-seconds");
+    if (!b || !secEl) { stopBreathingTimer(); return; }
+    b.secondsLeft -= 1;
+    if (b.secondsLeft <= 0) advanceBreathPhase();
+    else secEl.textContent = b.secondsLeft;
+  }
+
+  function stopMeditationTimer() {
+    if (meditationTimerHandle) { clearInterval(meditationTimerHandle); meditationTimerHandle = null; }
+  }
+
+  function startMeditation(minutes) {
+    if (MEDITATION_DURATIONS.indexOf(minutes) === -1) return;
+    stopMeditationTimer();
+    var total = minutes * 60;
+    var intervalSecs = Math.max(4, Math.floor(total / MEDITATION_LINES.length));
+    state.meditation = { secondsLeft: total, lineIndex: 0, nextLineAt: total - intervalSecs, intervalSecs: intervalSecs, done: false };
+    render();
+    meditationTimerHandle = setInterval(tickMeditation, 1000);
+  }
+
+  function stopMeditation() {
+    stopMeditationTimer();
+    state.meditation = null;
+    render();
+  }
+
+  function completeMeditation() {
+    stopMeditationTimer();
+    state.meditation.done = true;
+    beep(440, 400);
+    vibrate([120, 60, 120]);
+    render();
+  }
+
+  function tickMeditation() {
+    var m = state.meditation;
+    var timerEl = document.getElementById("meditation-timer");
+    if (!m || m.done || !timerEl) { stopMeditationTimer(); return; }
+    m.secondsLeft -= 1;
+    if (m.secondsLeft <= 0) { completeMeditation(); return; }
+    timerEl.textContent = formatMeditationTime(m.secondsLeft);
+    if (m.secondsLeft <= m.nextLineAt && m.lineIndex < MEDITATION_LINES.length - 1) {
+      m.lineIndex += 1;
+      m.nextLineAt -= m.intervalSecs;
+      var lineEl = document.getElementById("meditation-line");
+      if (lineEl) {
+        lineEl.textContent = MEDITATION_LINES[m.lineIndex];
+        lineEl.style.animation = "none";
+        void lineEl.offsetWidth;
+        lineEl.style.animation = "";
+      }
+    }
   }
 
   function openCategory(key) {
@@ -2655,6 +3221,10 @@
     else if (action === "save-plan") savePlan(form);
     else if (action === "save-preset-admin") savePresetAdmin(form.name.value.trim(), form.description.value.trim(), form.category.value);
     else if (action === "save-plan-message") savePlanMessage(form.kind.value, form.text.value.trim(), form.active.checked);
+    else if (action === "save-mood") {
+      var moodVal = parseInt(form.mood.value, 10);
+      if (!isNaN(moodVal)) saveMood(moodVal, form.note.value.trim());
+    }
     else if (action === "add-preset-exercise") {
       var peName = form.exname.value.trim();
       var peInstr = form.exinstructions.value.trim();
@@ -2725,7 +3295,37 @@
     else if (action === "delete-session") deleteSession(id);
     else if (action === "personalize-workout") personalizeWorkout();
     else if (action === "toggle-favorite") toggleFavorite(id);
+    else if (action === "benessere-tab") {
+      stopBreathingTimer(); state.breathing = null;
+      stopMeditationTimer(); state.meditation = null;
+      state.benessereTab = el.getAttribute("data-value");
+      state.moodDraft = { mood: null, note: "" };
+      render();
+    }
+    else if (action === "start-breathing") startBreathing(el.getAttribute("data-value"));
+    else if (action === "stop-breathing") stopBreathing();
+    else if (action === "start-meditation") startMeditation(parseInt(el.getAttribute("data-value"), 10));
+    else if (action === "stop-meditation") stopMeditation();
+    else if (action === "set-mood-value") {
+      var moodVal2 = parseInt(el.getAttribute("data-value"), 10);
+      state.moodDraft.mood = moodVal2;
+      var row = el.parentElement;
+      Array.prototype.forEach.call(row.children, function (btn) { btn.classList.remove("selected"); });
+      el.classList.add("selected");
+      var hiddenMood = document.querySelector('form[data-action="save-mood"] input[name="mood"]');
+      if (hiddenMood) hiddenMood.value = moodVal2;
+      var submitBtn = document.querySelector('form[data-action="save-mood"] button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = false;
+    }
   });
+
+  app.addEventListener("wheel", function (e) {
+    var row = e.target.closest(".pill-row");
+    if (!row) return;
+    if (row.scrollWidth <= row.clientWidth) return;
+    row.scrollLeft += e.deltaY;
+    e.preventDefault();
+  }, { passive: false });
 
   // ---------- boot ----------
 

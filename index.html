@@ -1043,6 +1043,8 @@
     else if (state.view === "planMessagesAdmin") body = renderPlanMessagesAdmin();
     else body = renderHome();
 
+    var pillScrollPositions = Array.prototype.map.call(app.querySelectorAll(".pill-row"), function (el) { return el.scrollLeft; });
+
     app.innerHTML =
       (showNav ? renderScreenHeader(tabTitles[state.view]) : "") +
       '<main class="screen">' +
@@ -1051,6 +1053,10 @@
         body +
       '</main>' +
       (showNav ? renderBottomNav() : "");
+
+    Array.prototype.forEach.call(app.querySelectorAll(".pill-row"), function (el, i) {
+      if (pillScrollPositions[i] != null) el.scrollLeft = pillScrollPositions[i];
+    });
 
     if (state.view === "workout" && state.activeSession) {
       startWorkoutTimer(state.activeSession.started_at);

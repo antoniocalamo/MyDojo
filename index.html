@@ -188,6 +188,28 @@
     padding: 0 4px;
   }
 
+  .plan-top-row { display: flex; align-items: stretch; gap: 10px; margin-bottom: 10px; }
+  .plan-top-row .greeting-card { flex: 1; min-width: 0; margin-bottom: 0; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px; }
+  .plan-top-row .greeting-card .mascot-badge { width: 32px; height: 32px; }
+  .plan-top-row .greeting-card .greeting-msg { font-size: 12px; line-height: 1.25; }
+  .plan-top-row .greeting-card .greeting-streak { font-size: 10px; padding: 2px 7px; margin-top: 4px; }
+  .plan-action-card {
+    flex: 1;
+    min-width: 0;
+    border-radius: var(--radius-lg);
+    padding: 12px;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    cursor: pointer;
+    border: 1px solid rgba(40,45,49,0.06);
+  }
+  .plan-action-card.live { box-shadow: 0 0 0 2px var(--cta); }
+  .plan-action-card .tag { font-size: 10px; padding: 3px 8px; width: fit-content; margin-bottom: 5px; }
+  .plan-action-card .action-title { font-size: 13px; font-weight: 800; margin: 0; }
+  .plan-action-card .action-meta { font-size: 10.5px; color: var(--text-dim); margin: 3px 0 0; line-height: 1.25; }
+
   .tag {
     display: inline-block;
     font-size: 11px;
@@ -1075,29 +1097,31 @@
     return list[idx].text;
   }
 
-  function renderPlanGreeting() {
+  function renderPlanGreeting(compact) {
     var trainedToday = hasTrainedToday();
     var streak = computeStreak();
     var activeMessages = state.dashboardMessages.filter(function (m) { return m.active; });
     var pool = activeMessages.filter(function (m) { return m.kind === (trainedToday ? "greeting_done" : "greeting_pending"); });
     var greeting = pickDailyMessage(pool) || (trainedToday ? "Allenamento di oggi fatto! Sei un vero guerriero 🎉" : "Pronto per allenarti oggi?");
     greeting = greeting.replace(/\{streak\}/g, streak);
-    var tip = pickDailyMessage(activeMessages.filter(function (m) { return m.kind === "tip"; }));
 
-    var html = '<div class="greeting-card">' +
-      mascotBadge(MASCOT_HEAD, 76) +
+    return '<div class="greeting-card">' +
+      mascotBadge(MASCOT_HEAD, compact ? 60 : 76) +
       '<div class="greeting-text">' +
         '<p class="greeting-msg">' + escapeHtml(greeting) + '</p>' +
         (streak > 0 ? '<span class="greeting-streak">🔥 ' + streak + ' giorni di fila</span>' : '') +
       '</div>' +
     '</div>';
-    if (tip) html += '<p class="greeting-tip">💡 ' + escapeHtml(tip) + '</p>';
-    return html;
+  }
+
+  function renderPlanTip() {
+    var activeMessages = state.dashboardMessages.filter(function (m) { return m.active; });
+    var tip = pickDailyMessage(activeMessages.filter(function (m) { return m.kind === "tip"; }));
+    return tip ? '<p class="greeting-tip">💡 ' + escapeHtml(tip) + '</p>' : '';
   }
 
   function renderPlan() {
     var todayIdx = currentWeekdayIndex();
-    var html = renderPlanGreeting();
 
     var assignedCount = 0, completedCount = 0, missedDay = null;
     var dayEntries = WEEKDAY_NAMES.map(function (name, idx) {
@@ -1112,25 +1136,29 @@
       return { name: name, idx: idx, tpl: tpl, done: done };
     });
 
+    var actionCard = "";
+    if (state.activeSession) {
+      actionCard = '<div class="plan-action-card live" style="background:' + gradientFor(state.activeSession.template_id || state.activeSession.id) + ';" data-action="resume-session">' +
+        '<span class="tag tag-solid">🏋️ In corso</span>' +
+        '<p class="action-title">' + escapeHtml(state.activeSession.template_name) + '</p>' +
+        '<p class="action-meta">Iniziato il ' + formatDate(state.activeSession.started_at) + ' — tocca per riprendere</p>' +
+      '</div>';
+    } else if (missedDay) {
+      actionCard = '<div class="plan-action-card" style="background:' + gradientFor(missedDay.tpl.id) + ';" data-action="start-session" data-id="' + missedDay.tpl.id + '">' +
+        '<span class="tag tag-solid">⏱️ Recupero</span>' +
+        '<p class="action-title">' + escapeHtml(missedDay.tpl.name) + '</p>' +
+        '<p class="action-meta">Saltato ' + missedDay.name + ' — tocca per recuperarlo</p>' +
+      '</div>';
+    }
+
+    var html = actionCard
+      ? '<div class="plan-top-row">' + renderPlanGreeting(true) + actionCard + '</div>'
+      : renderPlanGreeting(false);
+    html += renderPlanTip();
+
     html += '<p class="page-sub" style="margin-top:2px;">' +
       (assignedCount > 0 ? completedCount + ' di ' + assignedCount + ' allenamenti fatti questa settimana' : 'La tua settimana tipo') +
     '</p>';
-
-    if (state.activeSession) {
-      html += '<div class="hero-card live" style="background:' + gradientFor(state.activeSession.template_id || state.activeSession.id) + ';" data-action="resume-session">' +
-        '<span class="hero-icon">🏋️</span>' +
-        '<span class="tag tag-solid" style="width:fit-content;margin-bottom:8px;">In corso</span>' +
-        '<p class="hero-title">' + escapeHtml(state.activeSession.template_name) + '</p>' +
-        '<p class="hero-meta">Iniziato il ' + formatDate(state.activeSession.started_at) + ' — tocca per riprendere</p>' +
-      '</div>';
-    } else if (missedDay) {
-      html += '<div class="hero-card" style="background:' + gradientFor(missedDay.tpl.id) + ';" data-action="start-session" data-id="' + missedDay.tpl.id + '">' +
-        '<span class="hero-icon">⏱️</span>' +
-        '<span class="tag tag-solid" style="width:fit-content;margin-bottom:8px;">Recupero</span>' +
-        '<p class="hero-title">' + escapeHtml(missedDay.tpl.name) + '</p>' +
-        '<p class="hero-meta">Saltato ' + missedDay.name + ' — tocca per recuperarlo oggi</p>' +
-      '</div>';
-    }
 
     dayEntries.forEach(function (d) {
       var isToday = d.idx === todayIdx;

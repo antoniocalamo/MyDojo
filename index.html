@@ -2883,6 +2883,14 @@
     else if (action === "toggle-favorite") toggleFavorite(id);
   });
 
+  app.addEventListener("wheel", function (e) {
+    var row = e.target.closest(".pill-row");
+    if (!row) return;
+    if (row.scrollWidth <= row.clientWidth) return;
+    row.scrollLeft += e.deltaY;
+    e.preventDefault();
+  }, { passive: false });
+
   // ---------- boot ----------
 
   var booted = false;

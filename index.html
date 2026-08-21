@@ -2684,7 +2684,13 @@
     var phases = BREATH_TECHNIQUES[techniqueKey].phases;
     state.breathing = { technique: techniqueKey, phaseIndex: 0, secondsLeft: phases[0].secs, cycles: 0 };
     render();
-    applyBreathCircleTransform(phases[0]);
+    var circle = document.getElementById("breath-circle");
+    if (circle) {
+      circle.style.transition = "none";
+      circle.style.transform = "scale(0.62)";
+      void circle.offsetWidth; // forza il browser a "fissare" lo stato di partenza prima di animare
+    }
+    requestAnimationFrame(function () { applyBreathCircleTransform(phases[0]); });
     breathingTimerHandle = setInterval(tickBreathing, 1000);
   }
 

@@ -1015,6 +1015,9 @@
 
   // ---------- render ----------
 
+  var lastRenderedView = null;
+  var viewScrollMemory = {};
+
   function render() {
     if (state.view !== "workout") { stopWorkoutTimer(); stopCircuitTimer(); }
     if (state.view !== "benessere") {
@@ -1057,6 +1060,8 @@
     else body = renderHome();
 
     var pillScrollPositions = Array.prototype.map.call(app.querySelectorAll(".pill-row"), function (el) { return el.scrollLeft; });
+    var viewChanged = lastRenderedView !== null && lastRenderedView !== state.view;
+    if (viewChanged) viewScrollMemory[lastRenderedView] = window.scrollY;
 
     app.innerHTML =
       (showNav ? renderScreenHeader(tabTitles[state.view], state.view) : "") +
@@ -1070,6 +1075,9 @@
     Array.prototype.forEach.call(app.querySelectorAll(".pill-row"), function (el, i) {
       if (pillScrollPositions[i] != null) el.scrollLeft = pillScrollPositions[i];
     });
+
+    if (viewChanged) window.scrollTo(0, viewScrollMemory[state.view] || 0);
+    lastRenderedView = state.view;
 
     if (state.view === "workout" && state.activeSession) {
       startWorkoutTimer(state.activeSession.started_at);

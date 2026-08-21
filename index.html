@@ -568,6 +568,63 @@
   }
   .toggle-switch.on { background: var(--accent); }
   .toggle-switch.on::after { transform: translateX(20px); }
+
+  /* sezione Mente */
+  .breath-wrap { display: flex; flex-direction: column; align-items: center; padding: 18px 0 8px; }
+  .breath-circle {
+    width: 190px;
+    height: 190px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #f9e0cb, #f1a39f);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-ink);
+    transform: scale(0.62);
+    box-shadow: 0 8px 24px rgba(241,163,159,0.35);
+  }
+  .breath-circle .breath-phase { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .breath-circle .breath-seconds { font-size: 40px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .breath-cycles { color: var(--text-dim); font-size: 13px; margin: 18px 0 4px; }
+  .breath-idle-hint { color: var(--text-dim); font-size: 13px; text-align: center; max-width: 260px; margin: 14px auto 0; }
+
+  .meditation-wrap { display: flex; flex-direction: column; align-items: center; padding: 12px 0 8px; }
+  .meditation-timer { font-size: 44px; font-weight: 800; font-variant-numeric: tabular-nums; margin: 10px 0 18px; }
+  .meditation-line {
+    min-height: 66px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    max-width: 300px;
+    padding: 0 10px;
+    animation: meditation-fade 1.2s ease;
+  }
+  @keyframes meditation-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .meditation-done { font-size: 15px; font-weight: 700; color: var(--ok); margin-top: 6px; }
+
+  .mood-face-row { display: flex; justify-content: space-between; gap: 8px; margin: 4px 0 16px; }
+  .mood-face {
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 0;
+    font-size: 26px;
+    cursor: pointer;
+  }
+  .mood-face.selected { background: var(--accent); border-color: var(--accent); }
+  .mood-today-badge { display: inline-block; background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 700; margin-bottom: 10px; }
+  .mood-sparkline { width: 100%; height: 54px; margin: 4px 0 18px; }
+  .mood-entry-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .mood-entry-row:last-child { border-bottom: none; }
+  .mood-entry-emoji { font-size: 22px; flex-shrink: 0; }
+  .mood-entry-date { font-size: 12px; color: var(--text-dim); font-weight: 700; min-width: 62px; }
+  .mood-entry-note { font-size: 13px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -616,6 +673,48 @@
   ];
 
   var ADMIN_EMAIL = "antonio.calamo@gmail.com";
+
+  var BREATH_TECHNIQUES = {
+    box: {
+      label: "Box breathing",
+      phases: [
+        { name: "Inspira", key: "in", secs: 4 },
+        { name: "Trattieni", key: "hold", secs: 4 },
+        { name: "Espira", key: "out", secs: 4 },
+        { name: "Trattieni", key: "hold", secs: 4 }
+      ]
+    },
+    "478": {
+      label: "4-7-8",
+      phases: [
+        { name: "Inspira", key: "in", secs: 4 },
+        { name: "Trattieni", key: "hold", secs: 7 },
+        { name: "Espira", key: "out", secs: 8 }
+      ]
+    }
+  };
+
+  var MEDITATION_DURATIONS = [3, 5, 10];
+
+  var MEDITATION_LINES = [
+    "Chiudi gli occhi e trova una posizione comoda.",
+    "Porta l'attenzione al tuo respiro, senza forzarlo.",
+    "Lascia andare la tensione dalle spalle e dalla mascella.",
+    "Se la mente vaga, riportala dolcemente al respiro.",
+    "Senti il corpo che si appoggia, respiro dopo respiro.",
+    "Non c'è nulla da fare, solo essere qui ora.",
+    "Osserva i pensieri passare, senza seguirli.",
+    "Ancora qualche respiro tranquillo.",
+    "Quando sei pronto, riporta l'attenzione alla stanza."
+  ];
+
+  var MOOD_FACES = ["😞", "🙁", "😐", "🙂", "😄"];
+
+  function todayIso() {
+    var d = new Date();
+    var pad = function (n) { return n < 10 ? "0" + n : "" + n; };
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
 
   var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -671,7 +770,12 @@
     workoutStartOptions: { warmup: false, silent: false },
     circuit: null,
     stats: { count: 0, hours: 0 },
-    busy: false
+    busy: false,
+    benessereTab: "respiro",
+    breathing: null,
+    meditation: null,
+    moodEntries: [],
+    moodDraft: { mood: null, note: "" }
   };
 
   try {
@@ -683,6 +787,8 @@
   var app = document.getElementById("app");
   var workoutTimerHandle = null;
   var circuitTimerHandle = null;
+  var breathingTimerHandle = null;
+  var meditationTimerHandle = null;
   var audioCtx = null;
 
   function beep(freq, durMs) {
@@ -850,6 +956,10 @@
 
   function render() {
     if (state.view !== "workout") { stopWorkoutTimer(); stopCircuitTimer(); }
+    if (state.view !== "benessere") {
+      stopBreathingTimer(); state.breathing = null;
+      stopMeditationTimer(); state.meditation = null;
+    }
 
     if (state.view === "loading") {
       app.innerHTML = '<div class="empty">Caricamento...</div>';
@@ -1713,13 +1823,143 @@
     return html;
   }
 
+  function benessereTabPill(key, label) {
+    var active = state.benessereTab === key;
+    return '<button class="pill' + (active ? " active" : "") + '" data-action="benessere-tab" data-value="' + key + '">' + label + '</button>';
+  }
+
   function renderBenessere() {
-    return '<p class="page-sub" style="margin-top:2px;">Yoga, mindfulness, respirazione</p>' +
-      '<div class="empty" style="padding-top:60px;">' +
-        '<div style="font-size:48px;margin-bottom:12px;">🧘</div>' +
-        '<p style="font-size:16px;font-weight:700;color:var(--text);margin:0 0 6px;">Presto disponibile</p>' +
-        '<p style="max-width:280px;margin:0 auto;">Questa sezione sarà dedicata al tuo equilibrio mentale: esercizi di respirazione, meditazione guidata e stretching. Arriva in un prossimo aggiornamento.</p>' +
+    var html = '<p class="page-sub" style="margin-top:2px;">Respira, medita, osserva come ti senti</p>';
+    html += '<div class="pill-row">' +
+      benessereTabPill("respiro", "🫁 Respiro") +
+      benessereTabPill("meditazione", "🧘 Meditazione") +
+      benessereTabPill("diario", "📔 Diario") +
+    '</div>';
+    if (state.benessereTab === "meditazione") html += renderMeditationTab();
+    else if (state.benessereTab === "diario") html += renderMoodDiaryTab();
+    else html += renderBreathingTab();
+    return html;
+  }
+
+  // ---------- respiro ----------
+
+  function renderBreathingTab() {
+    var b = state.breathing;
+    var html = '';
+    if (!b) {
+      html += '<div class="pill-row">';
+      Object.keys(BREATH_TECHNIQUES).forEach(function (key) {
+        html += '<button class="pill" data-action="start-breathing" data-value="' + key + '">' + BREATH_TECHNIQUES[key].label + '</button>';
+      });
+      html += '</div>';
+      html += '<div class="breath-wrap"><div class="breath-circle"><span class="breath-phase">Pronto?</span></div></div>';
+      html += '<p class="breath-idle-hint">Scegli una tecnica per iniziare. Segui il cerchio: si espande quando inspiri, si ferma quando trattieni, si restringe quando espiri.</p>';
+    } else {
+      var phase = BREATH_TECHNIQUES[b.technique].phases[b.phaseIndex];
+      html += '<div class="breath-wrap">' +
+        '<div class="breath-circle" id="breath-circle"><span class="breath-phase" id="breath-phase">' + phase.name + '</span><span class="breath-seconds" id="breath-seconds">' + b.secondsLeft + '</span></div>' +
+        '<div class="breath-cycles">Cicli completati: <b id="breath-cycles">' + b.cycles + '</b></div>' +
+        '<button class="btn btn-ghost btn-small" data-action="stop-breathing">Interrompi</button>' +
       '</div>';
+    }
+    return html;
+  }
+
+  // ---------- meditazione ----------
+
+  function renderMeditationTab() {
+    var m = state.meditation;
+    var html = '';
+    if (!m) {
+      html += '<div class="pill-row">';
+      MEDITATION_DURATIONS.forEach(function (mins) {
+        html += '<button class="pill" data-action="start-meditation" data-value="' + mins + '">' + mins + ' min</button>';
+      });
+      html += '</div>';
+      html += '<div class="empty" style="padding-top:40px;">' +
+        '<div style="font-size:40px;margin-bottom:10px;">🕊️</div>' +
+        '<p style="max-width:260px;margin:0 auto;">Scegli quanto tempo vuoi dedicare a te. Ti accompagno con qualche frase, poi solo silenzio e respiro.</p>' +
+      '</div>';
+    } else if (m.done) {
+      html += '<div class="meditation-wrap">' +
+        '<div style="font-size:40px;margin-bottom:6px;">🙏</div>' +
+        '<p class="meditation-done">Sessione completata, ben fatto.</p>' +
+        '<button class="btn btn-ghost btn-small" style="margin-top:14px;" data-action="stop-meditation">Chiudi</button>' +
+      '</div>';
+    } else {
+      html += '<div class="meditation-wrap">' +
+        '<div class="meditation-timer" id="meditation-timer">' + formatMeditationTime(m.secondsLeft) + '</div>' +
+        '<div class="meditation-line" id="meditation-line">' + escapeHtml(MEDITATION_LINES[m.lineIndex]) + '</div>' +
+        '<button class="btn btn-ghost btn-small" style="margin-top:18px;" data-action="stop-meditation">Interrompi</button>' +
+      '</div>';
+    }
+    return html;
+  }
+
+  function formatMeditationTime(secs) {
+    var m = Math.floor(secs / 60);
+    var s = secs % 60;
+    return m + ":" + (s < 10 ? "0" + s : s);
+  }
+
+  // ---------- diario dell'umore ----------
+
+  function renderMoodDiaryTab() {
+    var today = todayIso();
+    var todayEntry = state.moodEntries.filter(function (e) { return e.entry_date === today; })[0] || null;
+    var selectedMood = state.moodDraft.mood != null ? state.moodDraft.mood : (todayEntry ? todayEntry.mood : null);
+    var html = '';
+    if (todayEntry) html += '<div class="mood-today-badge">✓ Hai già registrato l\'umore di oggi</div>';
+    html += '<form data-action="save-mood">';
+    html += '<input type="hidden" name="mood" value="' + (selectedMood || "") + '">';
+    html += '<label>Come ti senti oggi?</label>';
+    html += '<div class="mood-face-row">';
+    MOOD_FACES.forEach(function (face, i) {
+      var val = i + 1;
+      html += '<button type="button" class="mood-face' + (selectedMood === val ? " selected" : "") + '" data-action="set-mood-value" data-value="' + val + '">' + face + '</button>';
+    });
+    html += '</div>';
+    html += '<textarea name="note" rows="2" placeholder="Una nota veloce (facoltativa)">' + escapeHtml(state.moodDraft.note || (todayEntry ? todayEntry.note || "" : "")) + '</textarea>';
+    html += '<button type="submit" class="btn btn-accent" ' + (selectedMood ? "" : "disabled") + '>Salva</button>';
+    html += '</form>';
+
+    if (state.moodEntries.length > 0) {
+      html += '<h3 class="section-title">Ultimi giorni</h3>';
+      html += renderMoodSparkline();
+      html += '<div>';
+      state.moodEntries.slice(0, 14).forEach(function (e) {
+        var d = new Date(e.entry_date + "T00:00:00");
+        var label = d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
+        html += '<div class="mood-entry-row">' +
+          '<span class="mood-entry-date">' + label + '</span>' +
+          '<span class="mood-entry-emoji">' + MOOD_FACES[e.mood - 1] + '</span>' +
+          '<span class="mood-entry-note">' + escapeHtml(e.note || "") + '</span>' +
+        '</div>';
+      });
+      html += '</div>';
+    }
+    return html;
+  }
+
+  function renderMoodSparkline() {
+    var entries = state.moodEntries.slice(0, 14).slice().reverse();
+    if (entries.length < 2) return "";
+    var w = 280, h = 44, pad = 6;
+    var step = (w - pad * 2) / (entries.length - 1);
+    var points = entries.map(function (e, i) {
+      var x = pad + i * step;
+      var y = pad + (h - pad * 2) * (1 - (e.mood - 1) / 4);
+      return x.toFixed(1) + "," + y.toFixed(1);
+    });
+    var dots = entries.map(function (e, i) {
+      var x = pad + i * step;
+      var y = pad + (h - pad * 2) * (1 - (e.mood - 1) / 4);
+      return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="2.6" fill="#f1a39f"></circle>';
+    }).join("");
+    return '<svg class="mood-sparkline" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+      '<polyline points="' + points.join(" ") + '" fill="none" stroke="#f1a39f" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>' +
+      dots +
+    '</svg>';
   }
 
   function renderProfile() {
@@ -2188,8 +2428,146 @@
 
   function openBenessere() {
     state.authError = "";
-    state.view = "benessere";
+    withBusy(function () {
+      return loadMoodEntries().then(function () {
+        state.view = "benessere";
+      });
+    });
+  }
+
+  function loadMoodEntries() {
+    return sb.from("mood_entries").select("*").order("entry_date", { ascending: false }).limit(30).then(function (res) {
+      if (res.error) throw res.error;
+      state.moodEntries = res.data;
+    });
+  }
+
+  function saveMood(mood, note) {
+    withBusy(function () {
+      state.authError = "";
+      return sb.from("mood_entries").upsert({
+        user_id: state.user.id,
+        entry_date: todayIso(),
+        mood: mood,
+        note: note || null
+      }, { onConflict: "user_id,entry_date" }).then(function (res) {
+        if (res.error) throw res.error;
+        state.moodDraft = { mood: null, note: "" };
+        return loadMoodEntries();
+      }).then(function () {
+        showFlash("Umore salvato");
+      });
+    });
+  }
+
+  function stopBreathingTimer() {
+    if (breathingTimerHandle) { clearInterval(breathingTimerHandle); breathingTimerHandle = null; }
+  }
+
+  function applyBreathCircleTransform(phase) {
+    var circle = document.getElementById("breath-circle");
+    if (!circle) return;
+    if (phase.key === "in") {
+      circle.style.transition = "transform " + phase.secs + "s ease-in-out";
+      circle.style.transform = "scale(1.15)";
+    } else if (phase.key === "out") {
+      circle.style.transition = "transform " + phase.secs + "s ease-in-out";
+      circle.style.transform = "scale(0.62)";
+    }
+  }
+
+  function startBreathing(techniqueKey) {
+    if (!BREATH_TECHNIQUES[techniqueKey]) return;
+    stopBreathingTimer();
+    var phases = BREATH_TECHNIQUES[techniqueKey].phases;
+    state.breathing = { technique: techniqueKey, phaseIndex: 0, secondsLeft: phases[0].secs, cycles: 0 };
     render();
+    applyBreathCircleTransform(phases[0]);
+    breathingTimerHandle = setInterval(tickBreathing, 1000);
+  }
+
+  function stopBreathing() {
+    stopBreathingTimer();
+    state.breathing = null;
+    render();
+  }
+
+  function advanceBreathPhase() {
+    var b = state.breathing;
+    var phases = BREATH_TECHNIQUES[b.technique].phases;
+    b.phaseIndex += 1;
+    if (b.phaseIndex >= phases.length) {
+      b.phaseIndex = 0;
+      b.cycles += 1;
+    }
+    var phase = phases[b.phaseIndex];
+    b.secondsLeft = phase.secs;
+    beep(phase.key === "in" ? 520 : phase.key === "out" ? 400 : 460, 90);
+    vibrate(60);
+    var phaseEl = document.getElementById("breath-phase");
+    var secEl = document.getElementById("breath-seconds");
+    var cyclesEl = document.getElementById("breath-cycles");
+    if (phaseEl) phaseEl.textContent = phase.name;
+    if (secEl) secEl.textContent = b.secondsLeft;
+    if (cyclesEl) cyclesEl.textContent = b.cycles;
+    applyBreathCircleTransform(phase);
+  }
+
+  function tickBreathing() {
+    var b = state.breathing;
+    var secEl = document.getElementById("breath-seconds");
+    if (!b || !secEl) { stopBreathingTimer(); return; }
+    b.secondsLeft -= 1;
+    if (b.secondsLeft <= 0) advanceBreathPhase();
+    else secEl.textContent = b.secondsLeft;
+  }
+
+  function stopMeditationTimer() {
+    if (meditationTimerHandle) { clearInterval(meditationTimerHandle); meditationTimerHandle = null; }
+  }
+
+  function startMeditation(minutes) {
+    if (MEDITATION_DURATIONS.indexOf(minutes) === -1) return;
+    stopMeditationTimer();
+    var total = minutes * 60;
+    var intervalSecs = Math.max(4, Math.floor(total / MEDITATION_LINES.length));
+    state.meditation = { secondsLeft: total, lineIndex: 0, nextLineAt: total - intervalSecs, intervalSecs: intervalSecs, done: false };
+    render();
+    meditationTimerHandle = setInterval(tickMeditation, 1000);
+  }
+
+  function stopMeditation() {
+    stopMeditationTimer();
+    state.meditation = null;
+    render();
+  }
+
+  function completeMeditation() {
+    stopMeditationTimer();
+    state.meditation.done = true;
+    beep(440, 400);
+    vibrate([120, 60, 120]);
+    render();
+  }
+
+  function tickMeditation() {
+    var m = state.meditation;
+    var timerEl = document.getElementById("meditation-timer");
+    if (!m || m.done || !timerEl) { stopMeditationTimer(); return; }
+    m.secondsLeft -= 1;
+    if (m.secondsLeft <= 0) { completeMeditation(); return; }
+    timerEl.textContent = formatMeditationTime(m.secondsLeft);
+    if (m.secondsLeft <= m.nextLineAt && m.lineIndex < MEDITATION_LINES.length - 1) {
+      m.lineIndex += 1;
+      m.nextLineAt -= m.intervalSecs;
+      var lineEl = document.getElementById("meditation-line");
+      if (lineEl) {
+        lineEl.textContent = MEDITATION_LINES[m.lineIndex];
+        lineEl.style.animation = "none";
+        void lineEl.offsetWidth;
+        lineEl.style.animation = "";
+      }
+    }
   }
 
   function openCategory(key) {
@@ -2621,6 +2999,10 @@
     else if (action === "save-plan") savePlan(form);
     else if (action === "save-preset-admin") savePresetAdmin(form.name.value.trim(), form.description.value.trim(), form.category.value);
     else if (action === "save-plan-message") savePlanMessage(form.kind.value, form.text.value.trim(), form.active.checked);
+    else if (action === "save-mood") {
+      var moodVal = parseInt(form.mood.value, 10);
+      if (!isNaN(moodVal)) saveMood(moodVal, form.note.value.trim());
+    }
     else if (action === "add-preset-exercise") {
       var peName = form.exname.value.trim();
       var peInstr = form.exinstructions.value.trim();
@@ -2691,6 +3073,28 @@
     else if (action === "delete-session") deleteSession(id);
     else if (action === "personalize-workout") personalizeWorkout();
     else if (action === "toggle-favorite") toggleFavorite(id);
+    else if (action === "benessere-tab") {
+      stopBreathingTimer(); state.breathing = null;
+      stopMeditationTimer(); state.meditation = null;
+      state.benessereTab = el.getAttribute("data-value");
+      state.moodDraft = { mood: null, note: "" };
+      render();
+    }
+    else if (action === "start-breathing") startBreathing(el.getAttribute("data-value"));
+    else if (action === "stop-breathing") stopBreathing();
+    else if (action === "start-meditation") startMeditation(parseInt(el.getAttribute("data-value"), 10));
+    else if (action === "stop-meditation") stopMeditation();
+    else if (action === "set-mood-value") {
+      var moodVal2 = parseInt(el.getAttribute("data-value"), 10);
+      state.moodDraft.mood = moodVal2;
+      var row = el.parentElement;
+      Array.prototype.forEach.call(row.children, function (btn) { btn.classList.remove("selected"); });
+      el.classList.add("selected");
+      var hiddenMood = document.querySelector('form[data-action="save-mood"] input[name="mood"]');
+      if (hiddenMood) hiddenMood.value = moodVal2;
+      var submitBtn = document.querySelector('form[data-action="save-mood"] button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = false;
+    }
   });
 
   // ---------- boot ----------

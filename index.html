@@ -872,7 +872,8 @@
     breathing: null,
     meditation: null,
     moodEntries: [],
-    moodDraft: { mood: null, note: "" }
+    moodDraft: { mood: null, note: "" },
+    dojoToken: null
   };
 
   try {
@@ -2293,12 +2294,48 @@
     });
     html += '</div>';
 
+    html += '<h3 class="section-title">Integrazioni</h3>';
+    html += '<p class="page-sub" style="margin:0 0 10px;">Genera un codice per mostrare il tuo piano allenamenti come promemoria nella Home di My Ikigai.</p>';
+    if (state.dojoToken) {
+      html += '<div class="empty" style="text-align:left;">' +
+        '<p style="font-weight:700;margin:0 0 6px;">Codice generato — copialo e incollalo in My Ikigai (icona ingranaggio → sezione "My Dojo"):</p>' +
+        '<code style="display:block;word-break:break-all;background:var(--surface-2);padding:8px;border-radius:8px;font-size:12px;margin-bottom:8px;">' + escapeHtml(state.dojoToken) + '</code>' +
+        '<button class="btn btn-ghost" data-action="copy-dojo-token">📋 Copia codice</button>' +
+        '<p style="font-size:12px;color:var(--text-dim);margin:8px 0 0;">Se lo perdi, genera un nuovo codice qui sotto: quello vecchio smetterà subito di funzionare.</p>' +
+      '</div>';
+    }
+    html += '<button class="btn btn-ghost" data-action="generate-dojo-token" style="margin-top:8px;">🔑 ' + (state.dojoToken ? "Genera un nuovo codice" : "Genera codice per My Ikigai") + '</button>';
+    html += '<button class="btn btn-ghost" data-action="revoke-dojo-token" style="margin-top:8px;">🚫 Disattiva collegamento con My Ikigai</button>';
+
     if (isAdmin()) {
       html += '<button class="btn btn-ghost" data-action="open-plan-messages-admin" style="margin-top:20px;">🛠️ Messaggi del piano (admin)</button>';
     }
 
     html += '<button class="btn btn-ghost" data-action="logout" style="margin-top:12px;">Esci</button>';
     return html;
+  }
+
+  // ---------- integrazione My Ikigai ----------
+
+  function generateDojoToken() {
+    withBusy(function () {
+      state.authError = "";
+      return sb.rpc("generate_dojo_token").then(function (res) {
+        if (res.error) throw res.error;
+        state.dojoToken = res.data;
+      });
+    });
+  }
+
+  function revokeDojoToken() {
+    if (!confirm("Disattivare il collegamento con My Ikigai? Il codice attuale smetterà subito di funzionare e i promemoria non verranno più mostrati là finché non ne generi uno nuovo.")) return;
+    withBusy(function () {
+      state.authError = "";
+      return sb.rpc("revoke_dojo_token").then(function (res) {
+        if (res.error) throw res.error;
+        state.dojoToken = null;
+      });
+    });
   }
 
   function durationText(start, end) {
@@ -3455,6 +3492,13 @@
     var action = el.getAttribute("data-action");
     var id = el.getAttribute("data-id");
     if (action === "logout") handleLogout();
+    else if (action === "generate-dojo-token") generateDojoToken();
+    else if (action === "revoke-dojo-token") revokeDojoToken();
+    else if (action === "copy-dojo-token") {
+      if (navigator.clipboard && state.dojoToken) {
+        navigator.clipboard.writeText(state.dojoToken).catch(function () {});
+      }
+    }
     else if (action === "toggle-auth-mode") {
       state.authMode = state.authMode === "login" ? "signup" : "login";
       state.authError = "";

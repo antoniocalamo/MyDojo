@@ -150,7 +150,7 @@
   .cat-banner-img {
     display: block;
     width: 100%;
-    height: 110px;
+    aspect-ratio: 1536 / 342;
     object-fit: cover;
     border-radius: var(--radius-lg);
     margin-bottom: 16px;
@@ -614,6 +614,8 @@
     text-align: center;
     font-size: 64px;
   }
+  .workout-hero-img { max-width: 100%; max-height: 140px; display: block; margin: 0 auto; }
+  .workout-hero.has-img { padding: 14px; }
   .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; }
   .toggle-row + .toggle-row { border-top: 1px solid var(--border); }
   .toggle-label { font-size: 14px; font-weight: 700; margin: 0; }
@@ -1488,7 +1490,9 @@
     var isCircuit = exs.length > 0 && exs.every(function (ex) { return ex.duration_seconds != null; });
     var html = '<button class="back-btn" data-action="open-category" data-id="' + escapeHtml(state.currentCategory) + '">←</button>';
 
-    html += '<div class="workout-hero">🏋️</div>';
+    html += w.data.image_url
+      ? '<div class="workout-hero has-img"><img class="workout-hero-img" src="' + escapeHtml(w.data.image_url) + '" alt="' + escapeHtml(w.data.name) + '"></div>'
+      : '<div class="workout-hero">🏋️</div>';
     if (isPreset) {
       var isFav = state.favoriteIds.indexOf(w.data.id) !== -1;
       html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;">' +

@@ -1559,12 +1559,13 @@
               '<button data-action="move-preset-exercise-up" data-id="' + ex.id + '"' + (isFirst ? " disabled" : "") + '>▲</button>' +
               '<button data-action="move-preset-exercise-down" data-id="' + ex.id + '"' + (isLast ? " disabled" : "") + '>▼</button>' +
             '</div>' +
-            '<span class="name">' + escapeHtml(ex.name) + '</span>' +
+            '<span class="name">' + (ex.library_exercise_id ? "📚 " : "") + escapeHtml(ex.name) + '</span>' +
             '<input type="number" class="exercise-duration-input" data-action="update-preset-exercise-duration" data-id="' + ex.id + '" value="' + ex.duration_seconds + '" min="5">' +
             '<button data-action="delete-preset-exercise" data-id="' + ex.id + '">&times;</button>' +
           '</div>';
         });
       }
+      html += '<button class="btn btn-ghost btn-small" data-action="open-library-pick-preset" style="margin-top:4px;">📚 Scegli dalla libreria</button>';
       html += '<form data-action="add-preset-exercise" style="margin-top:10px;">' +
         '<label>Nome esercizio</label>' +
         '<input type="text" name="exname" required>' +
@@ -1641,9 +1642,14 @@
   }
 
   function renderLibrary() {
-    var html = state.libraryPickMode
-      ? '<button class="back-btn" data-action="open-template" data-id="' + state.currentTemplate.id + '">←</button>'
-      : '<button class="back-btn" data-action="go-home">←</button>';
+    var html;
+    if (state.libraryPickMode === "preset") {
+      html = '<button class="back-btn" data-action="open-preset-admin" data-id="' + state.currentPresetAdmin.id + '">←</button>';
+    } else if (state.libraryPickMode) {
+      html = '<button class="back-btn" data-action="open-template" data-id="' + state.currentTemplate.id + '">←</button>';
+    } else {
+      html = '<button class="back-btn" data-action="go-home">←</button>';
+    }
     html += '<h1 class="page-title">Libreria esercizi</h1>';
     html += '<p class="page-sub">' + (state.libraryPickMode ? "Scegli un esercizio da aggiungere all'obiettivo" : "Come si fanno e quali muscoli coinvolgono") + '</p>';
 
@@ -2569,11 +2575,13 @@
     withBusy(function () {
       state.authError = "";
       var orderIndex = state.currentTemplateExercises.length;
+      var matchedLibraryEx = state.libraryExercises.filter(function (le) { return le.name.trim().toLowerCase() === name.trim().toLowerCase(); })[0];
       return sb.from("template_exercises").insert({
         user_id: state.user.id,
         template_id: state.currentTemplate.id,
         name: name,
         duration_seconds: duration != null ? duration : 45,
+        library_exercise_id: matchedLibraryEx ? matchedLibraryEx.id : null,
         order_index: orderIndex
       }).then(function (res) {
         if (res.error) throw res.error;
@@ -3009,11 +3017,13 @@
     withBusy(function () {
       state.authError = "";
       var orderIndex = state.currentPresetAdminExercises.length;
+      var matchedLibraryEx = state.libraryExercises.filter(function (le) { return le.name.trim().toLowerCase() === name.trim().toLowerCase(); })[0];
       return sb.from("preset_template_exercises").insert({
         preset_template_id: state.currentPresetAdmin.id,
         name: name,
         instructions: instructions || null,
         duration_seconds: duration,
+        library_exercise_id: matchedLibraryEx ? matchedLibraryEx.id : null,
         order_index: orderIndex
       }).select().single().then(function (res) {
         if (res.error) throw res.error;
@@ -3201,6 +3211,7 @@
             name: ex.name,
             instructions: ex.instructions,
             duration_seconds: ex.duration_seconds,
+            library_exercise_id: ex.library_exercise_id || null,
             order_index: i
           };
         });
@@ -3264,7 +3275,7 @@
   function openLibrary(pickMode) {
     withBusy(function () {
       state.authError = "";
-      state.libraryPickMode = !!pickMode;
+      state.libraryPickMode = pickMode || false;
       state.libraryFilterMuscle = null;
       state.libraryFilterEquipment = null;
       state.view = "library";
@@ -3358,6 +3369,25 @@
       state.authError = "";
       var ex = state.libraryExercises.filter(function (x) { return x.id === id; })[0];
       if (!ex) return;
+      if (state.libraryPickMode === "preset") {
+        var presetOrderIndex = state.currentPresetAdminExercises.length;
+        return sb.from("preset_template_exercises").insert({
+          preset_template_id: state.currentPresetAdmin.id,
+          name: ex.name,
+          library_exercise_id: ex.id,
+          instructions: ex.instructions,
+          duration_seconds: 45,
+          order_index: presetOrderIndex
+        }).then(function (res) {
+          if (res.error) throw res.error;
+          return loadPresetExercises(state.currentPresetAdmin.id).then(function () {
+            state.currentPresetAdminExercises = state.currentPresetExercises;
+          });
+        }).then(function () {
+          state.libraryPickMode = false;
+          state.view = "presetAdmin";
+        });
+      }
       var orderIndex = state.currentTemplateExercises.length;
       return sb.from("template_exercises").insert({
         user_id: state.user.id,
@@ -3465,7 +3495,8 @@
     else if (action === "circuit-pause") toggleCircuitPause();
     else if (action === "circuit-skip") skipCircuitPhase();
     else if (action === "open-library") openLibrary(false);
-    else if (action === "open-library-pick") openLibrary(true);
+    else if (action === "open-library-pick") openLibrary("template");
+    else if (action === "open-library-pick-preset") openLibrary("preset");
     else if (action === "back-to-library") { state.view = "library"; render(); }
     else if (action === "open-library-detail") openLibraryDetail(id);
     else if (action === "pick-library-exercise") pickLibraryExercise(id);

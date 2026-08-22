@@ -1131,6 +1131,7 @@
     }
 
     ensureVideosPlay();
+    ensureLazyThumbs();
   }
 
   function handleVideoError(e) {
@@ -1162,6 +1163,21 @@
       var p = v.play();
       if (p && p.catch) p.catch(function () {});
     }
+  }
+
+  function ensureLazyThumbs() {
+    var thumbs = app.querySelectorAll("video[data-src]");
+    if (thumbs.length === 0) return;
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        var v = entry.target;
+        v.src = v.getAttribute("data-src");
+        v.removeAttribute("data-src");
+        observer.unobserve(v);
+      });
+    }, { rootMargin: "200px" });
+    for (var i = 0; i < thumbs.length; i++) observer.observe(thumbs[i]);
   }
 
   function displayName() {
@@ -1680,7 +1696,7 @@
       list.forEach(function (ex) {
         var action = state.libraryPickMode ? "pick-library-exercise" : "open-library-detail";
         var thumb = isVideoUrl(ex.image_url)
-          ? '<video class="exlib-card-thumb" src="' + escapeHtml(ex.image_url) + '" muted playsinline preload="metadata"></video>'
+          ? '<video class="exlib-card-thumb" data-src="' + escapeHtml(ex.image_url) + '" muted playsinline preload="none"></video>'
           : '<span class="exlib-card-icon">' + equipmentIcon(ex.equipment) + '</span>';
         html += '<div class="exlib-card" data-action="' + action + '" data-id="' + ex.id + '">' +
           (ex.user_id ? '<span class="tag exlib-badge">Personale</span>' : '') +

@@ -1174,6 +1174,7 @@
         var v = entry.target;
         v.src = v.getAttribute("data-src");
         v.removeAttribute("data-src");
+        v.load();
         observer.unobserve(v);
       });
     }, { rootMargin: "200px" });

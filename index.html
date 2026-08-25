@@ -157,6 +157,15 @@
     cursor: pointer;
     border: 1px solid rgba(40,45,49,0.06);
   }
+  .workout-banner-wrap { position: relative; margin-bottom: 8px; cursor: pointer; }
+  .workout-banner-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(40,45,49,0.06);
+  }
+  .workout-banner-badge { position: absolute; top: 8px; right: 8px; }
 
   .greeting-card {
     display: flex;
@@ -1437,7 +1446,7 @@
     var favPresets = state.presets.filter(function (p) { return state.favoriteIds.indexOf(p.id) !== -1; });
     if (favPresets.length > 0) {
       html += '<h3 class="section-title" style="margin-top:0;">❤️ I tuoi preferiti</h3>';
-      favPresets.forEach(function (p) { html += workoutCard(p.name, "preset", p.id, true); });
+      favPresets.forEach(function (p) { html += workoutCard(p.name, "preset", p.id, true, p.image_url); });
     }
 
     CATEGORIES.forEach(function (cat) {
@@ -1448,7 +1457,13 @@
     return html;
   }
 
-  function workoutCard(name, kind, id, isFav) {
+  function workoutCard(name, kind, id, isFav, imageUrl) {
+    if (imageUrl) {
+      return '<div class="workout-banner-wrap" data-action="open-workout" data-kind="' + kind + '" data-id="' + escapeHtml(id) + '">' +
+        (isFav ? '<span class="tag exlib-badge workout-banner-badge">❤️</span>' : '') +
+        '<img class="workout-banner-img" src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(name) + '">' +
+      '</div>';
+    }
     return '<div class="hero-card" style="background:' + gradientFor(id) + ';min-height:90px;" data-action="open-workout" data-kind="' + kind + '" data-id="' + escapeHtml(id) + '">' +
       (isFav ? '<span class="tag exlib-badge">❤️</span>' : '') +
       '<span class="hero-icon">🏋️</span>' +
@@ -1470,11 +1485,11 @@
 
     if (catalogItems.length > 0) {
       html += '<h3 class="section-title" style="margin-top:6px;">Obiettivi pronti</h3>';
-      catalogItems.forEach(function (p) { html += workoutCard(p.name, "preset", p.id, state.favoriteIds.indexOf(p.id) !== -1); });
+      catalogItems.forEach(function (p) { html += workoutCard(p.name, "preset", p.id, state.favoriteIds.indexOf(p.id) !== -1, p.image_url); });
     }
     if (myItems.length > 0) {
       html += '<h3 class="section-title">I tuoi obiettivi personalizzati</h3>';
-      myItems.forEach(function (t) { html += workoutCard(t.name, "template", t.id); });
+      myItems.forEach(function (t) { html += workoutCard(t.name, "template", t.id, false, t.image_url); });
     }
 
     if (isAdmin()) {

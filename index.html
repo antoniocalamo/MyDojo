@@ -777,7 +777,8 @@
   var CATEGORIES = [
     { key: "Forza", emoji: "💪", banner: "Logo/Categoria Forza.jpg" },
     { key: "Cardio", emoji: "🔥", banner: "Logo/Categoria Cardio.jpg" },
-    { key: "Stretching", emoji: "🤸", banner: "Logo/Categoria Stretching.jpg" }
+    { key: "Stretching", emoji: "🤸", banner: "Logo/Categoria Stretching.jpg" },
+    { key: "Divertimento", emoji: "🎉" }
   ];
 
   var ADMIN_EMAIL = "antonio.calamo@gmail.com";
@@ -1446,18 +1447,25 @@
     var favPresets = state.presets.filter(function (p) { return state.favoriteIds.indexOf(p.id) !== -1; });
     if (favPresets.length > 0) {
       html += '<h3 class="section-title" style="margin-top:0;">❤️ I tuoi preferiti</h3>';
-      favPresets.forEach(function (p) { html += workoutCard(p.name, "preset", p.id, true, p.image_url); });
+      favPresets.forEach(function (p) { html += workoutCard(p.name, "preset", p.id, true, p.image_url, p.icon); });
     }
 
     CATEGORIES.forEach(function (cat) {
-      html += '<img class="cat-banner-img" src="' + escapeHtml(cat.banner) + '" alt="' + escapeHtml(cat.key) + '" data-action="open-category" data-id="' + escapeHtml(cat.key) + '">';
+      if (cat.banner) {
+        html += '<img class="cat-banner-img" src="' + escapeHtml(cat.banner) + '" alt="' + escapeHtml(cat.key) + '" data-action="open-category" data-id="' + escapeHtml(cat.key) + '">';
+      } else {
+        html += '<div class="hero-card" style="background:' + gradientFor(cat.key) + ';min-height:90px;" data-action="open-category" data-id="' + escapeHtml(cat.key) + '">' +
+          '<span class="hero-icon">' + cat.emoji + '</span>' +
+          '<p class="hero-title">' + escapeHtml(cat.key) + '</p>' +
+        '</div>';
+      }
     });
 
     html += '<button class="btn btn-ghost" data-action="open-library" style="margin-top:6px;">📚 Libreria esercizi</button>';
     return html;
   }
 
-  function workoutCard(name, kind, id, isFav, imageUrl) {
+  function workoutCard(name, kind, id, isFav, imageUrl, icon) {
     if (imageUrl) {
       return '<div class="workout-banner-wrap" data-action="open-workout" data-kind="' + kind + '" data-id="' + escapeHtml(id) + '">' +
         (isFav ? '<span class="tag exlib-badge workout-banner-badge">❤️</span>' : '') +
@@ -1466,7 +1474,7 @@
     }
     return '<div class="hero-card" style="background:' + gradientFor(id) + ';min-height:90px;" data-action="open-workout" data-kind="' + kind + '" data-id="' + escapeHtml(id) + '">' +
       (isFav ? '<span class="tag exlib-badge">❤️</span>' : '') +
-      '<span class="hero-icon">🏋️</span>' +
+      '<span class="hero-icon">' + (icon || "🏋️") + '</span>' +
       '<p class="hero-title">' + escapeHtml(name) + '</p>' +
     '</div>';
   }
@@ -1485,7 +1493,7 @@
 
     if (catalogItems.length > 0) {
       html += '<h3 class="section-title" style="margin-top:6px;">Obiettivi pronti</h3>';
-      catalogItems.forEach(function (p) { html += workoutCard(p.name, "preset", p.id, state.favoriteIds.indexOf(p.id) !== -1, p.image_url); });
+      catalogItems.forEach(function (p) { html += workoutCard(p.name, "preset", p.id, state.favoriteIds.indexOf(p.id) !== -1, p.image_url, p.icon); });
     }
     if (myItems.length > 0) {
       html += '<h3 class="section-title">I tuoi obiettivi personalizzati</h3>';
@@ -1507,7 +1515,7 @@
 
     html += w.data.image_url
       ? '<div class="workout-hero has-img"><img class="workout-hero-img" src="' + escapeHtml(w.data.image_url) + '" alt="' + escapeHtml(w.data.name) + '"></div>'
-      : '<div class="workout-hero">🏋️</div>';
+      : '<div class="workout-hero">' + (w.data.icon || "🏋️") + '</div>';
     if (isPreset) {
       var isFav = state.favoriteIds.indexOf(w.data.id) !== -1;
       html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;">' +
@@ -1578,6 +1586,8 @@
       '<select name="category">' +
         CATEGORIES.map(function (c) { return '<option value="' + escapeHtml(c.key) + '" ' + ((p.category || CATEGORIES[0].key) === c.key ? "selected" : "") + '>' + escapeHtml(c.key) + '</option>'; }).join("") +
       '</select>' +
+      '<label>Icona emoji (mostrata finché non c\'è un banner)</label>' +
+      '<input type="text" name="icon" value="' + escapeHtml(p.icon || "") + '" placeholder="🏋️" maxlength="8">' +
       '<button class="btn btn-accent" type="submit">Salva</button>' +
     '</form>';
 
@@ -3059,23 +3069,24 @@
     render();
   }
 
-  function savePresetAdmin(name, description, category) {
+  function savePresetAdmin(name, description, category, icon) {
     withBusy(function () {
       state.authError = "";
       if (state.currentPresetAdmin.id) {
-        return sb.from("preset_templates").update({ name: name, description: description, category: category }).eq("id", state.currentPresetAdmin.id).select().single()
+        return sb.from("preset_templates").update({ name: name, description: description, category: category, icon: icon || null }).eq("id", state.currentPresetAdmin.id).select().single()
           .then(function (res) {
             if (res.error) throw res.error;
             state.currentPresetAdmin.name = name;
             state.currentPresetAdmin.description = description;
             state.currentPresetAdmin.category = category;
+            state.currentPresetAdmin.icon = icon || null;
             state.currentCategory = category;
             return loadPresets();
           }).then(function () {
             showFlash("Obiettivo aggiornato");
           });
       }
-      return sb.from("preset_templates").insert({ name: name, description: description, category: category }).select().single()
+      return sb.from("preset_templates").insert({ name: name, description: description, category: category, icon: icon || null }).select().single()
         .then(function (res) {
           if (res.error) throw res.error;
           state.currentPresetAdmin = res.data;
@@ -3509,7 +3520,7 @@
       if (!isNaN(reps) && !isNaN(weight)) addSet(exId, exName, reps, weight);
     } else if (action === "save-library-exercise") saveLibraryExercise(form);
     else if (action === "save-plan") savePlan(form);
-    else if (action === "save-preset-admin") savePresetAdmin(form.name.value.trim(), form.description.value.trim(), form.category.value);
+    else if (action === "save-preset-admin") savePresetAdmin(form.name.value.trim(), form.description.value.trim(), form.category.value, form.icon.value.trim());
     else if (action === "save-plan-message") savePlanMessage(form.kind.value, form.text.value.trim(), form.active.checked);
     else if (action === "save-mood") {
       var moodVal = parseInt(form.mood.value, 10);

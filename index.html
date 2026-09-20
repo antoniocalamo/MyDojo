@@ -165,6 +165,11 @@
     border: 1px solid rgba(40,45,49,0.06);
   }
   .workout-banner-badge { position: absolute; top: 8px; right: 8px; }
+  .workout-banner-badge-left { left: 8px; right: auto; }
+
+  .view-mode-toggle { display: flex; gap: 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px; margin-top: 12px; }
+  .view-mode-btn { flex: 1; background: transparent; border: none; border-radius: 999px; padding: 8px 0; font-size: 13px; font-weight: 600; color: var(--text-dim); cursor: pointer; }
+  .view-mode-btn.active { background: var(--accent); color: var(--accent-ink); }
 
   .greeting-card {
     display: flex;
@@ -871,6 +876,8 @@
     currentCategory: null,
     currentWorkout: null,
     currentWorkoutExercises: [],
+    currentWorkoutPersonalExercises: [],
+    workoutViewMode: "preset",
     currentPresetAdmin: null,
     currentPresetAdminExercises: [],
     dashboardMessages: [],
@@ -1464,14 +1471,16 @@
     return html;
   }
 
-  function workoutCard(name, kind, id, isFav, imageUrl, icon) {
+  function workoutCard(name, kind, id, isFav, imageUrl, icon, isCustomized) {
     if (imageUrl) {
       return '<div class="workout-banner-wrap" data-action="open-workout" data-kind="' + kind + '" data-id="' + escapeHtml(id) + '">' +
+        (isCustomized ? '<span class="tag exlib-badge workout-banner-badge workout-banner-badge-left">✏️</span>' : '') +
         (isFav ? '<span class="tag exlib-badge workout-banner-badge">❤️</span>' : '') +
         '<img class="workout-banner-img" src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(name) + '">' +
       '</div>';
     }
     return '<div class="hero-card" style="background:' + gradientFor(id) + ';min-height:90px;" data-action="open-workout" data-kind="' + kind + '" data-id="' + escapeHtml(id) + '">' +
+      (isCustomized ? '<span class="tag exlib-badge" style="left:8px;right:auto;">✏️</span>' : '') +
       (isFav ? '<span class="tag exlib-badge">❤️</span>' : '') +
       '<span class="hero-icon">' + (icon || "🏋️") + '</span>' +
       '<p class="hero-title">' + escapeHtml(name) + '</p>' +
@@ -1485,6 +1494,7 @@
 
     var myItems = state.templates.filter(function (t) { return (t.category || CATEGORIES[0].key) === cat; });
     var catalogItems = state.presets.filter(function (p) { return (p.category || CATEGORIES[0].key) === cat; });
+    var orphanItems = myItems.filter(function (t) { return !t.source_preset_id; });
 
     if (myItems.length === 0 && catalogItems.length === 0) {
       html += '<div class="empty">Nessun obiettivo in questa categoria ancora.</div>';
@@ -1492,11 +1502,14 @@
 
     if (catalogItems.length > 0) {
       html += '<h3 class="section-title" style="margin-top:6px;">Obiettivi pronti</h3>';
-      catalogItems.forEach(function (p) { html += workoutCard(p.name, "preset", p.id, state.favoriteIds.indexOf(p.id) !== -1, p.image_url, p.icon); });
+      catalogItems.forEach(function (p) {
+        var isCustomized = myItems.some(function (t) { return t.source_preset_id === p.id; });
+        html += workoutCard(p.name, "preset", p.id, state.favoriteIds.indexOf(p.id) !== -1, p.image_url, p.icon, isCustomized);
+      });
     }
-    if (myItems.length > 0) {
+    if (orphanItems.length > 0) {
       html += '<h3 class="section-title">I tuoi obiettivi personalizzati</h3>';
-      myItems.forEach(function (t) { html += workoutCard(t.name, "template", t.id, false, t.image_url); });
+      orphanItems.forEach(function (t) { html += workoutCard(t.name, "template", t.id, false, t.image_url); });
     }
 
     if (isAdmin()) {
@@ -1507,8 +1520,12 @@
 
   function renderWorkoutDetail() {
     var w = state.currentWorkout;
-    var exs = state.currentWorkoutExercises;
     var isPreset = w.kind === "preset";
+    var hasLinkedPersonal = isPreset && !!w.linkedPersonal;
+    var mode = hasLinkedPersonal ? state.workoutViewMode : "preset";
+    var viewData = (hasLinkedPersonal && mode === "personal") ? w.linkedPersonal : w.data;
+    var exs = (hasLinkedPersonal && mode === "personal") ? state.currentWorkoutPersonalExercises : state.currentWorkoutExercises;
+    var readOnly = hasLinkedPersonal && mode === "preset";
     var isCircuit = exs.length > 0 && exs.every(function (ex) { return ex.duration_seconds != null; });
     var html = '<button class="back-btn" data-action="open-category" data-id="' + escapeHtml(state.currentCategory) + '">←</button>';
 
@@ -1518,28 +1535,38 @@
     if (isPreset) {
       var isFav = state.favoriteIds.indexOf(w.data.id) !== -1;
       html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;">' +
-        '<h1 class="page-title" style="margin:0;">' + escapeHtml(w.data.name) + '</h1>' +
+        '<h1 class="page-title" style="margin:0;">' + escapeHtml(viewData.name) + '</h1>' +
         '<button class="btn btn-ghost btn-small" data-action="toggle-favorite" data-id="' + w.data.id + '" style="flex-shrink:0;">' + (isFav ? "❤️" : "🤍") + '</button>' +
       '</div>';
     } else {
-      html += '<h1 class="page-title" style="margin-top:10px;">' + escapeHtml(w.data.name) + '</h1>';
+      html += '<h1 class="page-title" style="margin-top:10px;">' + escapeHtml(viewData.name) + '</h1>';
     }
-    if (isPreset && w.data.description) html += '<p class="page-sub">' + escapeHtml(w.data.description) + '</p>';
+
+    if (hasLinkedPersonal) {
+      html += '<div class="view-mode-toggle">' +
+        '<button class="view-mode-btn' + (mode === "personal" ? " active" : "") + '" data-action="set-workout-view-mode" data-value="personal">Tuo</button>' +
+        '<button class="view-mode-btn' + (mode === "preset" ? " active" : "") + '" data-action="set-workout-view-mode" data-value="preset">Pronto</button>' +
+      '</div>';
+    }
+
+    if (mode === "preset" && w.data.description) html += '<p class="page-sub">' + escapeHtml(w.data.description) + '</p>';
 
     if (isCircuit) {
-      var rest = restSecondsFor(w.data);
+      var rest = restSecondsFor(viewData);
       var totalSeconds = exs.reduce(function (sum, ex) { return sum + ex.duration_seconds; }, 0) + Math.max(0, exs.length - 1) * rest;
       html += '<div class="stats-row">' +
         '<div class="stat-tile"><span class="num">' + exs.length + '</span><span class="lbl">Esercizi</span></div>' +
         '<div class="stat-tile"><span class="num">' + formatDuration(totalSeconds) + '</span><span class="lbl">Durata</span></div>' +
       '</div>';
 
-      html += '<div class="card" style="margin-top:4px;">' +
-        '<div class="toggle-row"><div><p class="toggle-label">Inizia con il riscaldamento</p><p class="toggle-sub">Aggiunge 3 esercizi di riscaldamento prima di iniziare</p></div>' +
-          '<button class="toggle-switch' + (state.workoutStartOptions.warmup ? " on" : "") + '" data-action="toggle-warmup"></button></div>' +
-        '<div class="toggle-row"><div><p class="toggle-label">Allenamento silenzioso</p><p class="toggle-sub">Evita i salti nel riscaldamento</p></div>' +
-          '<button class="toggle-switch' + (state.workoutStartOptions.silent ? " on" : "") + '" data-action="toggle-silent"></button></div>' +
-      '</div>';
+      if (!readOnly) {
+        html += '<div class="card" style="margin-top:4px;">' +
+          '<div class="toggle-row"><div><p class="toggle-label">Inizia con il riscaldamento</p><p class="toggle-sub">Aggiunge 3 esercizi di riscaldamento prima di iniziare</p></div>' +
+            '<button class="toggle-switch' + (state.workoutStartOptions.warmup ? " on" : "") + '" data-action="toggle-warmup"></button></div>' +
+          '<div class="toggle-row"><div><p class="toggle-label">Allenamento silenzioso</p><p class="toggle-sub">Evita i salti nel riscaldamento</p></div>' +
+            '<button class="toggle-switch' + (state.workoutStartOptions.silent ? " on" : "") + '" data-action="toggle-silent"></button></div>' +
+        '</div>';
+      }
     } else {
       html += '<div class="stats-row"><div class="stat-tile"><span class="num">' + exs.length + '</span><span class="lbl">Esercizi</span></div></div>';
     }
@@ -1558,6 +1585,15 @@
 
     if (w.kind === "template") {
       html += '<button class="btn btn-ghost" data-action="edit-workout-template" data-id="' + w.data.id + '" style="margin-top:14px;">✏️ Personalizza esercizi</button>';
+    } else if (hasLinkedPersonal) {
+      if (mode === "personal") {
+        html += '<button class="btn btn-ghost" data-action="edit-workout-template" data-id="' + w.linkedPersonal.id + '" style="margin-top:14px;">✏️ Personalizza esercizi</button>';
+      } else {
+        html += '<button class="btn btn-ghost" data-action="reset-personal-to-preset" style="margin-top:14px;">↺ Reimposta la tua versione a questa</button>';
+      }
+      if (isAdmin()) {
+        html += '<button class="btn btn-ghost" data-action="open-preset-admin" data-id="' + w.data.id + '" style="margin-top:8px;">🛠️ Modifica nel catalogo (admin)</button>';
+      }
     } else {
       html += '<button class="btn btn-ghost" data-action="personalize-workout" style="margin-top:14px;">✏️ Personalizza</button>';
       if (isAdmin()) {
@@ -1566,7 +1602,9 @@
     }
 
     html += '<div style="height:70px;"></div>';
-    html += '<div class="fixed-cta"><button class="btn btn-cta" data-action="start-workout" ' + ((state.activeSession || exs.length === 0) ? "disabled" : "") + '>Inizio</button></div>';
+    if (!readOnly) {
+      html += '<div class="fixed-cta"><button class="btn btn-cta" data-action="start-workout" ' + ((state.activeSession || exs.length === 0) ? "disabled" : "") + '>Inizio</button></div>';
+    }
     return html;
   }
 
@@ -3031,20 +3069,31 @@
     withBusy(function () {
       state.authError = "";
       state.workoutStartOptions = { warmup: false, silent: false };
+      state.currentWorkoutPersonalExercises = [];
       if (kind === "template") {
         var t = state.templates.filter(function (x) { return x.id === id; })[0];
-        state.currentWorkout = { kind: "template", data: t };
+        state.currentWorkout = { kind: "template", data: t, linkedPersonal: null };
+        state.workoutViewMode = "personal";
         state.view = "workoutDetail";
         return loadTemplateExercises(id).then(function () {
           state.currentWorkoutExercises = state.currentTemplateExercises;
         });
       }
       var p = state.presets.filter(function (x) { return x.id === id; })[0];
-      state.currentWorkout = { kind: "preset", data: p };
+      var linkedPersonal = state.templates.filter(function (x) { return x.source_preset_id === id; })[0] || null;
+      state.currentWorkout = { kind: "preset", data: p, linkedPersonal: linkedPersonal };
+      state.workoutViewMode = linkedPersonal ? "personal" : "preset";
       state.view = "workoutDetail";
-      return loadPresetExercises(id).then(function () {
+      var loads = [loadPresetExercises(id).then(function () {
         state.currentWorkoutExercises = state.currentPresetExercises;
-      });
+      })];
+      if (linkedPersonal) {
+        loads.push(sb.from("template_exercises").select("*").eq("template_id", linkedPersonal.id).order("order_index", { ascending: true }).then(function (res) {
+          if (res.error) throw res.error;
+          state.currentWorkoutPersonalExercises = res.data;
+        }));
+      }
+      return Promise.all(loads);
     });
   }
 
@@ -3284,7 +3333,7 @@
   }
 
   function clonePresetToPersonal(preset, exercises, category) {
-    return sb.from("workout_templates").insert({ user_id: state.user.id, name: preset.name, category: category, rest_seconds: restSecondsFor(preset) }).select().single()
+    return sb.from("workout_templates").insert({ user_id: state.user.id, name: preset.name, category: category, rest_seconds: restSecondsFor(preset), source_preset_id: preset.id }).select().single()
       .then(function (res) {
         if (res.error) throw res.error;
         var newTplId = res.data.id;
@@ -3302,7 +3351,7 @@
         return sb.from("template_exercises").insert(rows).select().then(function (res2) {
           if (res2.error) throw res2.error;
           return loadTemplates().then(function () {
-            return { id: newTplId, name: preset.name, category: category, rest_seconds: res.data.rest_seconds, exercises: res2.data };
+            return { id: newTplId, name: preset.name, category: category, rest_seconds: res.data.rest_seconds, source_preset_id: preset.id, exercises: res2.data };
           });
         });
       });
@@ -3315,8 +3364,50 @@
       if (w.kind === "template") {
         return beginSession(w.data.id, w.data.name, state.currentWorkoutExercises, restSecondsFor(w.data));
       }
+      if (w.linkedPersonal) {
+        var exs = state.workoutViewMode === "personal" ? state.currentWorkoutPersonalExercises : state.currentWorkoutExercises;
+        return beginSession(w.linkedPersonal.id, w.linkedPersonal.name, exs, restSecondsFor(w.linkedPersonal));
+      }
       return clonePresetToPersonal(w.data, state.currentWorkoutExercises, state.currentCategory).then(function (tpl) {
         return beginSession(tpl.id, tpl.name, tpl.exercises, restSecondsFor(tpl));
+      });
+    });
+  }
+
+  function resetPersonalToPreset() {
+    withBusy(function () {
+      state.authError = "";
+      var w = state.currentWorkout;
+      var tplId = w.linkedPersonal.id;
+      return sb.from("template_exercises").delete().eq("template_id", tplId).then(function (res) {
+        if (res.error) throw res.error;
+        var rows = state.currentWorkoutExercises.map(function (ex, i) {
+          return {
+            user_id: state.user.id,
+            template_id: tplId,
+            name: ex.name,
+            instructions: ex.instructions,
+            duration_seconds: ex.duration_seconds,
+            library_exercise_id: ex.library_exercise_id || null,
+            order_index: i
+          };
+        });
+        return sb.from("template_exercises").insert(rows).select();
+      }).then(function (res2) {
+        if (res2.error) throw res2.error;
+        return sb.from("workout_templates").update({ name: w.data.name, rest_seconds: restSecondsFor(w.data) }).eq("id", tplId).select().single();
+      }).then(function (res3) {
+        if (res3.error) throw res3.error;
+        return loadTemplates().then(function () {
+          var t = state.templates.filter(function (x) { return x.id === tplId; })[0];
+          state.currentWorkout.linkedPersonal = t;
+          return sb.from("template_exercises").select("*").eq("template_id", tplId).order("order_index", { ascending: true });
+        });
+      }).then(function (res4) {
+        if (res4.error) throw res4.error;
+        state.currentWorkoutPersonalExercises = res4.data;
+        state.workoutViewMode = "personal";
+        showFlash("La tua versione è stata reimpostata");
       });
     });
   }
@@ -3603,6 +3694,8 @@
     else if (action === "delete-session") deleteSession(id);
     else if (action === "personalize-workout") personalizeWorkout();
     else if (action === "toggle-favorite") toggleFavorite(id);
+    else if (action === "set-workout-view-mode") { state.workoutViewMode = el.getAttribute("data-value"); render(); }
+    else if (action === "reset-personal-to-preset") resetPersonalToPreset();
     else if (action === "benessere-tab") {
       stopBreathingTimer(); state.breathing = null;
       stopMeditationTimer(); state.meditation = null;

@@ -165,7 +165,6 @@
     border: 1px solid rgba(40,45,49,0.06);
   }
   .workout-banner-badge { position: absolute; top: 8px; right: 8px; }
-  .workout-banner-badge-left { left: 8px; right: auto; }
 
   .view-mode-toggle { display: flex; gap: 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px; margin-top: 12px; }
   .view-mode-btn { flex: 1; background: transparent; border: none; border-radius: 999px; padding: 8px 0; font-size: 13px; font-weight: 600; color: var(--text-dim); cursor: pointer; }
@@ -1471,16 +1470,14 @@
     return html;
   }
 
-  function workoutCard(name, kind, id, isFav, imageUrl, icon, isCustomized) {
+  function workoutCard(name, kind, id, isFav, imageUrl, icon) {
     if (imageUrl) {
       return '<div class="workout-banner-wrap" data-action="open-workout" data-kind="' + kind + '" data-id="' + escapeHtml(id) + '">' +
-        (isCustomized ? '<span class="tag exlib-badge workout-banner-badge workout-banner-badge-left">✏️</span>' : '') +
         (isFav ? '<span class="tag exlib-badge workout-banner-badge">❤️</span>' : '') +
         '<img class="workout-banner-img" src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(name) + '">' +
       '</div>';
     }
     return '<div class="hero-card" style="background:' + gradientFor(id) + ';min-height:90px;" data-action="open-workout" data-kind="' + kind + '" data-id="' + escapeHtml(id) + '">' +
-      (isCustomized ? '<span class="tag exlib-badge" style="left:8px;right:auto;">✏️</span>' : '') +
       (isFav ? '<span class="tag exlib-badge">❤️</span>' : '') +
       '<span class="hero-icon">' + (icon || "🏋️") + '</span>' +
       '<p class="hero-title">' + escapeHtml(name) + '</p>' +
@@ -1503,8 +1500,7 @@
     if (catalogItems.length > 0) {
       html += '<h3 class="section-title" style="margin-top:6px;">Obiettivi pronti</h3>';
       catalogItems.forEach(function (p) {
-        var isCustomized = myItems.some(function (t) { return t.source_preset_id === p.id; });
-        html += workoutCard(p.name, "preset", p.id, state.favoriteIds.indexOf(p.id) !== -1, p.image_url, p.icon, isCustomized);
+        html += workoutCard(p.name, "preset", p.id, state.favoriteIds.indexOf(p.id) !== -1, p.image_url, p.icon);
       });
     }
     if (orphanItems.length > 0) {
@@ -1525,7 +1521,6 @@
     var mode = hasLinkedPersonal ? state.workoutViewMode : "preset";
     var viewData = (hasLinkedPersonal && mode === "personal") ? w.linkedPersonal : w.data;
     var exs = (hasLinkedPersonal && mode === "personal") ? state.currentWorkoutPersonalExercises : state.currentWorkoutExercises;
-    var readOnly = hasLinkedPersonal && mode === "preset";
     var isCircuit = exs.length > 0 && exs.every(function (ex) { return ex.duration_seconds != null; });
     var html = '<button class="back-btn" data-action="open-category" data-id="' + escapeHtml(state.currentCategory) + '">←</button>';
 
@@ -1544,8 +1539,8 @@
 
     if (hasLinkedPersonal) {
       html += '<div class="view-mode-toggle">' +
-        '<button class="view-mode-btn' + (mode === "personal" ? " active" : "") + '" data-action="set-workout-view-mode" data-value="personal">Tuo</button>' +
-        '<button class="view-mode-btn' + (mode === "preset" ? " active" : "") + '" data-action="set-workout-view-mode" data-value="preset">Pronto</button>' +
+        '<button class="view-mode-btn' + (mode === "personal" ? " active" : "") + '" data-action="set-workout-view-mode" data-value="personal">Personalizzato</button>' +
+        '<button class="view-mode-btn' + (mode === "preset" ? " active" : "") + '" data-action="set-workout-view-mode" data-value="preset">Base</button>' +
       '</div>';
     }
 
@@ -1559,14 +1554,12 @@
         '<div class="stat-tile"><span class="num">' + formatDuration(totalSeconds) + '</span><span class="lbl">Durata</span></div>' +
       '</div>';
 
-      if (!readOnly) {
-        html += '<div class="card" style="margin-top:4px;">' +
-          '<div class="toggle-row"><div><p class="toggle-label">Inizia con il riscaldamento</p><p class="toggle-sub">Aggiunge 3 esercizi di riscaldamento prima di iniziare</p></div>' +
-            '<button class="toggle-switch' + (state.workoutStartOptions.warmup ? " on" : "") + '" data-action="toggle-warmup"></button></div>' +
-          '<div class="toggle-row"><div><p class="toggle-label">Allenamento silenzioso</p><p class="toggle-sub">Evita i salti nel riscaldamento</p></div>' +
-            '<button class="toggle-switch' + (state.workoutStartOptions.silent ? " on" : "") + '" data-action="toggle-silent"></button></div>' +
-        '</div>';
-      }
+      html += '<div class="card" style="margin-top:4px;">' +
+        '<div class="toggle-row"><div><p class="toggle-label">Inizia con il riscaldamento</p><p class="toggle-sub">Aggiunge 3 esercizi di riscaldamento prima di iniziare</p></div>' +
+          '<button class="toggle-switch' + (state.workoutStartOptions.warmup ? " on" : "") + '" data-action="toggle-warmup"></button></div>' +
+        '<div class="toggle-row"><div><p class="toggle-label">Allenamento silenzioso</p><p class="toggle-sub">Evita i salti nel riscaldamento</p></div>' +
+          '<button class="toggle-switch' + (state.workoutStartOptions.silent ? " on" : "") + '" data-action="toggle-silent"></button></div>' +
+      '</div>';
     } else {
       html += '<div class="stats-row"><div class="stat-tile"><span class="num">' + exs.length + '</span><span class="lbl">Esercizi</span></div></div>';
     }
@@ -1589,7 +1582,7 @@
       if (mode === "personal") {
         html += '<button class="btn btn-ghost" data-action="edit-workout-template" data-id="' + w.linkedPersonal.id + '" style="margin-top:14px;">✏️ Personalizza esercizi</button>';
       } else {
-        html += '<button class="btn btn-ghost" data-action="reset-personal-to-preset" style="margin-top:14px;">↺ Reimposta la tua versione a questa</button>';
+        html += '<button class="btn btn-ghost" data-action="reset-personal-to-preset" style="margin-top:14px;">↺ Reimposta la tua versione personalizzata a questa</button>';
       }
       if (isAdmin()) {
         html += '<button class="btn btn-ghost" data-action="open-preset-admin" data-id="' + w.data.id + '" style="margin-top:8px;">🛠️ Modifica nel catalogo (admin)</button>';
@@ -1602,9 +1595,7 @@
     }
 
     html += '<div style="height:70px;"></div>';
-    if (!readOnly) {
-      html += '<div class="fixed-cta"><button class="btn btn-cta" data-action="start-workout" ' + ((state.activeSession || exs.length === 0) ? "disabled" : "") + '>Inizio</button></div>';
-    }
+    html += '<div class="fixed-cta"><button class="btn btn-cta" data-action="start-workout" ' + ((state.activeSession || exs.length === 0) ? "disabled" : "") + '>Inizio</button></div>';
     return html;
   }
 
@@ -3365,8 +3356,10 @@
         return beginSession(w.data.id, w.data.name, state.currentWorkoutExercises, restSecondsFor(w.data));
       }
       if (w.linkedPersonal) {
-        var exs = state.workoutViewMode === "personal" ? state.currentWorkoutPersonalExercises : state.currentWorkoutExercises;
-        return beginSession(w.linkedPersonal.id, w.linkedPersonal.name, exs, restSecondsFor(w.linkedPersonal));
+        var usePersonal = state.workoutViewMode === "personal";
+        var exs = usePersonal ? state.currentWorkoutPersonalExercises : state.currentWorkoutExercises;
+        var srcData = usePersonal ? w.linkedPersonal : w.data;
+        return beginSession(w.linkedPersonal.id, srcData.name, exs, restSecondsFor(srcData));
       }
       return clonePresetToPersonal(w.data, state.currentWorkoutExercises, state.currentCategory).then(function (tpl) {
         return beginSession(tpl.id, tpl.name, tpl.exercises, restSecondsFor(tpl));
@@ -3375,6 +3368,7 @@
   }
 
   function resetPersonalToPreset() {
+    if (!confirm("Sovrascrivere la tua versione personalizzata con quella base? Le modifiche che hai fatto andranno perse.")) return;
     withBusy(function () {
       state.authError = "";
       var w = state.currentWorkout;

@@ -1533,6 +1533,7 @@
         '<h1 class="page-title" style="margin:0;">' + escapeHtml(viewData.name) + '</h1>' +
         '<button class="btn btn-ghost btn-small" data-action="toggle-favorite" data-id="' + w.data.id + '" style="flex-shrink:0;">' + (isFav ? "❤️" : "🤍") + '</button>' +
       '</div>';
+      if (w.data.description) html += '<p class="page-sub">' + escapeHtml(w.data.description) + '</p>';
     } else {
       html += '<h1 class="page-title" style="margin-top:10px;">' + escapeHtml(viewData.name) + '</h1>';
     }
@@ -1543,8 +1544,6 @@
         '<button class="view-mode-btn' + (mode === "preset" ? " active" : "") + '" data-action="set-workout-view-mode" data-value="preset">Base</button>' +
       '</div>';
     }
-
-    if (mode === "preset" && w.data.description) html += '<p class="page-sub">' + escapeHtml(w.data.description) + '</p>';
 
     if (isCircuit) {
       var rest = restSecondsFor(viewData);
@@ -1579,11 +1578,7 @@
     if (w.kind === "template") {
       html += '<button class="btn btn-ghost" data-action="edit-workout-template" data-id="' + w.data.id + '" style="margin-top:14px;">✏️ Personalizza esercizi</button>';
     } else if (hasLinkedPersonal) {
-      if (mode === "personal") {
-        html += '<button class="btn btn-ghost" data-action="edit-workout-template" data-id="' + w.linkedPersonal.id + '" style="margin-top:14px;">✏️ Personalizza esercizi</button>';
-      } else {
-        html += '<button class="btn btn-ghost" data-action="reset-personal-to-preset" style="margin-top:14px;">↺ Reimposta la tua versione personalizzata a questa</button>';
-      }
+      html += '<button class="btn btn-ghost" data-action="edit-workout-template" data-id="' + w.linkedPersonal.id + '" style="margin-top:14px;">✏️ Personalizza esercizi</button>';
       if (isAdmin()) {
         html += '<button class="btn btn-ghost" data-action="open-preset-admin" data-id="' + w.data.id + '" style="margin-top:8px;">🛠️ Modifica nel catalogo (admin)</button>';
       }
@@ -3367,45 +3362,6 @@
     });
   }
 
-  function resetPersonalToPreset() {
-    if (!confirm("Sovrascrivere la tua versione personalizzata con quella base? Le modifiche che hai fatto andranno perse.")) return;
-    withBusy(function () {
-      state.authError = "";
-      var w = state.currentWorkout;
-      var tplId = w.linkedPersonal.id;
-      return sb.from("template_exercises").delete().eq("template_id", tplId).then(function (res) {
-        if (res.error) throw res.error;
-        var rows = state.currentWorkoutExercises.map(function (ex, i) {
-          return {
-            user_id: state.user.id,
-            template_id: tplId,
-            name: ex.name,
-            instructions: ex.instructions,
-            duration_seconds: ex.duration_seconds,
-            library_exercise_id: ex.library_exercise_id || null,
-            order_index: i
-          };
-        });
-        return sb.from("template_exercises").insert(rows).select();
-      }).then(function (res2) {
-        if (res2.error) throw res2.error;
-        return sb.from("workout_templates").update({ name: w.data.name, rest_seconds: restSecondsFor(w.data) }).eq("id", tplId).select().single();
-      }).then(function (res3) {
-        if (res3.error) throw res3.error;
-        return loadTemplates().then(function () {
-          var t = state.templates.filter(function (x) { return x.id === tplId; })[0];
-          state.currentWorkout.linkedPersonal = t;
-          return sb.from("template_exercises").select("*").eq("template_id", tplId).order("order_index", { ascending: true });
-        });
-      }).then(function (res4) {
-        if (res4.error) throw res4.error;
-        state.currentWorkoutPersonalExercises = res4.data;
-        state.workoutViewMode = "personal";
-        showFlash("La tua versione è stata reimpostata");
-      });
-    });
-  }
-
   function personalizeWorkout() {
     withBusy(function () {
       state.authError = "";
@@ -3689,7 +3645,6 @@
     else if (action === "personalize-workout") personalizeWorkout();
     else if (action === "toggle-favorite") toggleFavorite(id);
     else if (action === "set-workout-view-mode") { state.workoutViewMode = el.getAttribute("data-value"); render(); }
-    else if (action === "reset-personal-to-preset") resetPersonalToPreset();
     else if (action === "benessere-tab") {
       stopBreathingTimer(); state.breathing = null;
       stopMeditationTimer(); state.meditation = null;

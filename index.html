@@ -3358,7 +3358,7 @@
   }
 
   function clonePresetToPersonal(preset, exercises, category) {
-    return sb.from("workout_templates").insert({ user_id: state.user.id, name: preset.name, category: category, rest_seconds: restSecondsFor(preset), source_preset_id: preset.id }).select().single()
+    return sb.from("workout_templates").insert({ user_id: state.user.id, name: preset.name, category: category, rest_seconds: restSecondsFor(preset), source_preset_id: preset.id, image_url: preset.image_url || null }).select().single()
       .then(function (res) {
         if (res.error) throw res.error;
         var newTplId = res.data.id;
@@ -3376,7 +3376,7 @@
         return sb.from("template_exercises").insert(rows).select().then(function (res2) {
           if (res2.error) throw res2.error;
           return loadTemplates().then(function () {
-            return { id: newTplId, name: preset.name, category: category, rest_seconds: res.data.rest_seconds, source_preset_id: preset.id, exercises: res2.data };
+            return { id: newTplId, name: preset.name, category: category, rest_seconds: res.data.rest_seconds, source_preset_id: preset.id, image_url: res.data.image_url, exercises: res2.data };
           });
         });
       });

@@ -309,29 +309,11 @@
     font-family: inherit;
   }
 
-  .set-list { list-style: none; margin: 10px 0; padding: 0; }
-  .set-list li {
-    display: flex;
-    justify-content: space-between;
-    font-size: 14px;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  .set-list li .num { color: var(--text-dim); }
-  .set-list li .val { font-weight: 700; }
-
   .heatmap-grid { display: flex; gap: 3px; overflow-x: auto; padding: 2px; }
   .heatmap-col { display: flex; flex-direction: column; gap: 3px; }
   .heatmap-cell { width: 11px; height: 11px; border-radius: 3px; background: var(--surface-2); }
   .heatmap-cell.trained { background: var(--cta); }
   .heatmap-cell.future { visibility: hidden; }
-
-  .set-form { margin-top: 10px; }
-  .set-form-row { display: flex; gap: 8px; align-items: flex-end; }
-  .set-form .field { flex: 1; }
-  .set-form input { margin-bottom: 0; }
-  .set-form-row button { width: auto; padding: 13px 16px; }
-  .set-form input[name="note"] { margin-top: 8px; font-size: 13px; }
 
   .link-btn { background: none; border: none; color: var(--accent); font-size: 14px; font-weight: 600; cursor: pointer; padding: 4px 0; }
 
@@ -902,13 +884,9 @@
     weeklyPlan: [],
     profileReturnTab: null,
     flashMessage: null,
-    sessionSets: [],
     history: [],
-    statsSets: [],
     historyDetail: null,
-    historyDetailSets: [],
     historyDetailExercises: [],
-    currentExerciseProgress: null,
     presets: [],
     currentPresetExercises: [],
     currentCategory: null,
@@ -1142,7 +1120,7 @@
       return;
     }
 
-    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "categoryDetail", "workoutDetail", "presetAdmin", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEdit", "planMessagesAdmin", "exerciseProgress", "sessionSummary"];
+    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "categoryDetail", "workoutDetail", "presetAdmin", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEdit", "planMessagesAdmin", "sessionSummary"];
     if (knownViews.indexOf(state.view) === -1) state.view = "plan";
 
     var tabs = ["plan", "home", "benessere", "history"];
@@ -1158,7 +1136,6 @@
       else if (state.view === "sessionSummary") body = renderSessionSummary();
       else if (state.view === "history") body = renderHistory();
       else if (state.view === "historyDetail") body = renderHistoryDetail();
-      else if (state.view === "exerciseProgress") body = renderExerciseProgress();
       else if (state.view === "profile") body = renderProfile();
       else if (state.view === "categoryDetail") body = renderCategoryDetail();
       else if (state.view === "workoutDetail") body = renderWorkoutDetail();
@@ -1992,11 +1969,11 @@
   }
 
   function renderWorkout() {
-    if (isCircuitSession()) {
-      if (state.circuit) return renderCircuitPlayer();
-      return '<div class="empty">Allenamento completato...</div>';
+    if (state.circuit) return renderCircuitPlayer();
+    if (state.sessionExercises.length === 0) {
+      return '<div class="empty">Questo obiettivo non ha esercizi.<br>Aggiungili prima di allenarti.</div>';
     }
-    return renderWorkoutFreeform();
+    return '<div class="empty">Allenamento completato...</div>';
   }
 
   function findExerciseMedia(ex) {
@@ -2061,48 +2038,6 @@
     return html;
   }
 
-  function renderWorkoutFreeform() {
-    var s = state.activeSession;
-    var html = '<button class="back-btn" data-action="go-home">←</button>';
-    html += '<div class="hero-card" style="background:' + gradientFor(s.template_id || s.id) + ';min-height:100px;cursor:default;">' +
-      '<span class="hero-icon">🏋️</span>' +
-      '<p class="hero-title">' + escapeHtml(s.template_name) + '</p>' +
-      '<p class="hero-meta">In corso da <span id="workout-elapsed">' + elapsedText(s.started_at) + '</span></p>' +
-    '</div>';
-
-    if (state.sessionExercises.length === 0) {
-      html += '<div class="empty">Questo obiettivo non ha esercizi.<br>Aggiungili prima di allenarti.</div>';
-    }
-
-    state.sessionExercises.forEach(function (ex) {
-      var sets = state.sessionSets.filter(function (st) { return st.template_exercise_id === ex.id; });
-      html += '<div class="card">' +
-        '<p style="font-size:16px;font-weight:700;margin:0 0 4px;">' + escapeHtml(ex.name) + '</p>';
-
-      if (sets.length > 0) {
-        html += '<ul class="set-list">';
-        sets.forEach(function (st) {
-          html += '<li><span class="num">Serie ' + st.set_number + (st.note ? ' · ' + escapeHtml(st.note) : '') + '</span><span class="val">' + st.reps + ' rip. × ' + st.weight + ' kg</span></li>';
-        });
-        html += '</ul>';
-      }
-
-      html += '<form class="set-form" data-action="add-set" data-exercise-id="' + ex.id + '" data-exercise-name="' + escapeHtml(ex.name) + '">' +
-        '<div class="set-form-row">' +
-          '<div class="field"><label>Ripetizioni</label><input type="number" name="reps" min="0" required></div>' +
-          '<div class="field"><label>Peso (kg)</label><input type="number" name="weight" min="0" step="0.5" required></div>' +
-          '<button class="btn btn-accent" type="submit">+</button>' +
-        '</div>' +
-        '<input type="text" name="note" placeholder="Nota (facoltativa), es. presa larga" maxlength="140">' +
-      '</form>' +
-      '</div>';
-    });
-
-    html += '<button class="btn btn-danger btn-small" data-action="cancel-session" style="width:100%;margin-top:4px;">Annulla allenamento</button>';
-    html += '<div style="height:70px;"></div>';
-    html += '<div class="fixed-cta"><button class="btn btn-cta" data-action="finish-session">Termina allenamento</button></div>';
-    return html;
-  }
 
   function renderHeatmap() {
     var weeksCount = 12;
@@ -2140,135 +2075,6 @@
     return '<div class="card">' + html + '</div>';
   }
 
-  function computeSessionVolumes(limit) {
-    var volBySession = {};
-    state.statsSets.forEach(function (st) {
-      var v = (Number(st.reps) || 0) * (Number(st.weight) || 0);
-      volBySession[st.session_id] = (volBySession[st.session_id] || 0) + v;
-    });
-    var finished = state.history.filter(function (s) { return s.finished_at; });
-    var recent = finished.slice(0, limit).reverse();
-    return recent.map(function (s) {
-      return { date: s.started_at, volume: Math.round(volBySession[s.id] || 0) };
-    });
-  }
-
-  function renderVolumeChart() {
-    var data = computeSessionVolumes(10);
-    if (data.length < 2) {
-      return '<div class="card"><div class="empty" style="padding:16px;">Completa almeno 2 allenamenti con peso registrato per vedere il grafico del volume.</div></div>';
-    }
-    var w = 300, h = 120, padBottom = 20, padTop = 10;
-    var maxVol = Math.max.apply(null, data.map(function (d) { return d.volume; }));
-    if (maxVol <= 0) {
-      return '<div class="card"><div class="empty" style="padding:16px;">Questi allenamenti non hanno serie con peso e ripetizioni registrati (es. mobilità o circuiti a tempo), quindi non c\'è volume da mostrare.</div></div>';
-    }
-    var barGap = 6;
-    var barWidth = (w - barGap * (data.length - 1)) / data.length;
-    var svg = "";
-    data.forEach(function (d, i) {
-      var barH = Math.max(2, Math.round((d.volume / maxVol) * (h - padTop - padBottom)));
-      var x = i * (barWidth + barGap);
-      var y = h - padBottom - barH;
-      var label = shortDate(d.date);
-      svg += '<rect x="' + x.toFixed(1) + '" y="' + y + '" width="' + barWidth.toFixed(1) + '" height="' + barH +
-        '" rx="3" style="fill:var(--cta);"><title>' + label + ': ' + d.volume + ' kg</title></rect>';
-      svg += '<text x="' + (x + barWidth / 2).toFixed(1) + '" y="' + (h - 4) +
-        '" font-size="8" text-anchor="middle" style="fill:var(--text-dim);">' + label + '</text>';
-    });
-    return '<div class="card"><svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:120px;overflow:visible;display:block;">' + svg + '</svg></div>';
-  }
-
-  function prGroupKey(st) {
-    return st.library_exercise_id ? ("lib:" + st.library_exercise_id) : ("name:" + (st.exercise_name || "").trim().toLowerCase());
-  }
-
-  function computePRs() {
-    var best = {};
-    state.statsSets.forEach(function (st) {
-      var w = Number(st.weight) || 0;
-      if (w <= 0) return;
-      var key = prGroupKey(st);
-      if (!best[key] || w > best[key].weight) {
-        best[key] = { key: key, exercise: st.exercise_name, weight: w, reps: st.reps, date: st.created_at };
-      }
-    });
-    var list = [];
-    for (var k in best) { if (best.hasOwnProperty(k)) list.push(best[k]); }
-    list.sort(function (a, b) { return b.weight - a.weight; });
-    return list;
-  }
-
-  function renderPRList() {
-    var prs = computePRs();
-    if (prs.length === 0) {
-      return '<div class="card"><div class="empty" style="padding:16px;">Ancora nessun record da mostrare.</div></div>';
-    }
-    var html = '<div class="card"><ul class="set-list">';
-    prs.forEach(function (p) {
-      html += '<li data-action="open-exercise-progress" data-key="' + escapeHtml(p.key) + '" data-name="' + escapeHtml(p.exercise) + '" style="cursor:pointer;">' +
-        '<span class="num">' + escapeHtml(p.exercise) + '</span><span class="val">' +
-        p.weight + ' kg × ' + p.reps + ' rip. · ' + shortDate(p.date) + ' ›</span></li>';
-    });
-    html += '</ul></div>';
-    return html;
-  }
-
-  function computeExerciseHistory(key) {
-    var byDate = {};
-    state.statsSets.forEach(function (st) {
-      if (prGroupKey(st) !== key) return;
-      var w = Number(st.weight) || 0;
-      if (w <= 0) return;
-      var d = dateKey(new Date(st.created_at));
-      if (!byDate[d] || w > byDate[d].weight) {
-        byDate[d] = { date: st.created_at, weight: w, reps: st.reps };
-      }
-    });
-    var list = [];
-    for (var k in byDate) { if (byDate.hasOwnProperty(k)) list.push(byDate[k]); }
-    list.sort(function (a, b) { return new Date(a.date) - new Date(b.date); });
-    return list;
-  }
-
-  function renderExerciseProgress() {
-    var info = state.currentExerciseProgress;
-    var data = computeExerciseHistory(info.key);
-    var html = '<button class="back-btn" data-action="open-history">←</button>';
-    html += '<h1 class="page-title">' + escapeHtml(info.label) + '</h1>';
-    html += '<p class="page-sub">Andamento del peso nel tempo</p>';
-
-    if (data.length === 0) {
-      html += '<div class="card"><div class="empty" style="padding:16px;">Nessuna serie con peso registrata per questo esercizio.</div></div>';
-    } else if (data.length === 1) {
-      html += '<div class="card"><div class="empty" style="padding:16px;">Serve almeno un secondo allenamento con questo esercizio per vedere un grafico.</div></div>';
-    } else {
-      var w = 300, h = 120, padBottom = 20, padTop = 10;
-      var maxW = Math.max.apply(null, data.map(function (d) { return d.weight; }));
-      var barGap = 6;
-      var barWidth = (w - barGap * (data.length - 1)) / data.length;
-      var svg = "";
-      data.forEach(function (d, i) {
-        var barH = Math.max(2, Math.round((d.weight / maxW) * (h - padTop - padBottom)));
-        var x = i * (barWidth + barGap);
-        var y = h - padBottom - barH;
-        var label = shortDate(d.date);
-        svg += '<rect x="' + x.toFixed(1) + '" y="' + y + '" width="' + barWidth.toFixed(1) + '" height="' + barH +
-          '" rx="3" style="fill:var(--cta);"><title>' + label + ': ' + d.weight + ' kg × ' + d.reps + ' rip.</title></rect>';
-        svg += '<text x="' + (x + barWidth / 2).toFixed(1) + '" y="' + (h - 4) +
-          '" font-size="8" text-anchor="middle" style="fill:var(--text-dim);">' + label + '</text>';
-      });
-      html += '<div class="card"><svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:120px;overflow:visible;display:block;">' + svg + '</svg></div>';
-    }
-
-    html += '<h3 class="section-title">Storico serie</h3>';
-    html += '<div class="card"><ul class="set-list">';
-    data.slice().reverse().forEach(function (d) {
-      html += '<li><span class="num">' + shortDate(d.date) + '</span><span class="val">' + d.weight + ' kg × ' + d.reps + ' rip.</span></li>';
-    });
-    html += '</ul></div>';
-    return html;
-  }
 
   function renderHistory() {
     var html = '<p class="page-sub" style="margin-top:2px;">I tuoi allenamenti passati</p>';
@@ -2281,14 +2087,6 @@
     html += '<h3 class="section-title" style="margin-top:0;">Costanza</h3>' +
       '<p class="page-sub" style="margin:-4px 0 8px;font-size:12.5px;">Un pallino colorato per ogni giorno in cui ti sei allenato, raggruppati per settimana (lun–dom).</p>';
     html += renderHeatmap();
-
-    html += '<h3 class="section-title">Volume nel tempo</h3>' +
-      '<p class="page-sub" style="margin:-4px 0 8px;font-size:12.5px;">Ripetizioni × peso sommati per allenamento (solo esercizi con peso registrato).</p>';
-    html += renderVolumeChart();
-
-    html += '<h3 class="section-title">Record personali</h3>' +
-      '<p class="page-sub" style="margin:-4px 0 8px;font-size:12.5px;">Il peso più alto sollevato per ogni esercizio, con data.</p>';
-    html += renderPRList();
 
     html += '<h3 class="section-title">Cronologia</h3>';
     if (state.history.length === 0) {
@@ -2314,32 +2112,15 @@
     html += '<p class="page-sub">' + formatDate(s.started_at) +
       (s.finished_at ? " — durata " + durationText(s.started_at, s.finished_at) : " — in corso") + '</p>';
 
-    var byExercise = {};
-    var order = [];
-    state.historyDetailSets.forEach(function (st) {
-      if (!byExercise[st.exercise_name]) { byExercise[st.exercise_name] = []; order.push(st.exercise_name); }
-      byExercise[st.exercise_name].push(st);
-    });
-
-    if (order.length === 0) {
-      if (state.historyDetailExercises.length > 0) {
-        html += '<p class="page-sub" style="margin-top:-8px;">Esercizi di questo circuito:</p>';
-        state.historyDetailExercises.forEach(function (ex) {
-          html += '<div class="exercise-row"><span class="name">' + escapeHtml(ex.name) + '</span>' +
-            (ex.duration_seconds ? '<span class="tag" style="background:var(--surface-2);color:var(--text-dim);">' + ex.duration_seconds + 's</span>' : '') +
-          '</div>';
-        });
-      } else {
-        html += '<div class="empty">Nessuna serie registrata in questo allenamento.</div>';
-      }
-    } else {
-      order.forEach(function (name) {
-        html += '<div class="card"><p style="font-weight:700;margin:0 0 4px;">' + escapeHtml(name) + '</p><ul class="set-list">';
-        byExercise[name].forEach(function (st) {
-          html += '<li><span class="num">Serie ' + st.set_number + (st.note ? ' · ' + escapeHtml(st.note) : '') + '</span><span class="val">' + st.reps + ' rip. × ' + st.weight + ' kg</span></li>';
-        });
-        html += '</ul></div>';
+    if (state.historyDetailExercises.length > 0) {
+      html += '<p class="page-sub" style="margin-top:-8px;">Esercizi di questo circuito:</p>';
+      state.historyDetailExercises.forEach(function (ex) {
+        html += '<div class="exercise-row"><span class="name">' + escapeHtml(ex.name) + '</span>' +
+          (ex.duration_seconds ? '<span class="tag" style="background:var(--surface-2);color:var(--text-dim);">' + ex.duration_seconds + 's</span>' : '') +
+        '</div>';
       });
+    } else {
+      html += '<div class="empty">Nessun esercizio registrato in questo allenamento.</div>';
     }
 
     if (s.finished_at) {
@@ -2361,24 +2142,8 @@
       '<div class="stat-tile"><span class="num">' + sum.exerciseCount + '</span><span class="lbl">Esercizi</span></div>' +
     '</div>';
 
-    if (!sum.isCircuit && sum.totalSets > 0) {
-      html += '<div class="stats-row">' +
-        '<div class="stat-tile"><span class="num">' + sum.totalSets + '</span><span class="lbl">Serie</span></div>' +
-        '<div class="stat-tile"><span class="num">' + sum.totalVolume + ' kg</span><span class="lbl">Volume totale</span></div>' +
-      '</div>';
-    }
-
     if (sum.streak > 1) {
       html += '<div class="card session-summary-streak">🔥 ' + sum.streak + ' giorni di fila!</div>';
-    }
-
-    if (sum.newPRs.length > 0) {
-      html += '<h3 class="section-title">🏆 Nuovi record personali!</h3>';
-      html += '<div class="card"><ul class="set-list">';
-      sum.newPRs.forEach(function (pr) {
-        html += '<li><span class="num">' + escapeHtml(pr.exercise) + '</span><span class="val">' + pr.weight + ' kg</span></li>';
-      });
-      html += '</ul></div>';
     }
 
     html += '<button class="btn btn-cta" data-action="dismiss-session-summary" style="margin-top:24px;width:100%;">Fantastico! Continua</button>';
@@ -2627,16 +2392,12 @@
   }
 
   function loadSessionData(sessionId, templateId) {
-    var p1 = templateId
-      ? sb.from("template_exercises").select("*").eq("template_id", templateId).order("order_index", { ascending: true })
-      : Promise.resolve({ data: [] });
-    var p2 = sb.from("session_sets").select("*").eq("session_id", sessionId).order("created_at", { ascending: true });
-    return Promise.all([p1, p2]).then(function (results) {
-      if (results[0].error) throw results[0].error;
-      if (results[1].error) throw results[1].error;
-      state.sessionExercises = results[0].data;
-      state.sessionSets = results[1].data;
-    });
+    if (!templateId) { state.sessionExercises = []; return Promise.resolve(); }
+    return sb.from("template_exercises").select("*").eq("template_id", templateId).order("order_index", { ascending: true })
+      .then(function (res) {
+        if (res.error) throw res.error;
+        state.sessionExercises = res.data;
+      });
   }
 
   function loadHistory() {
@@ -2653,27 +2414,12 @@
       });
   }
 
-  function loadStatsSets() {
-    return sb.from("session_sets").select("session_id, exercise_name, library_exercise_id, reps, weight, created_at")
-      .then(function (res) {
-        if (res.error) throw res.error;
-        state.statsSets = res.data;
-      });
-  }
-
   function loadHistoryDetail(sessionId, templateId) {
-    return sb.from("session_sets").select("*").eq("session_id", sessionId).order("created_at", { ascending: true })
+    if (!templateId) { state.historyDetailExercises = []; return Promise.resolve(); }
+    return sb.from("template_exercises").select("*").eq("template_id", templateId).order("order_index", { ascending: true })
       .then(function (res) {
         if (res.error) throw res.error;
-        state.historyDetailSets = res.data;
-        if (res.data.length === 0 && templateId) {
-          return sb.from("template_exercises").select("*").eq("template_id", templateId).order("order_index", { ascending: true })
-            .then(function (res2) {
-              if (res2.error) throw res2.error;
-              state.historyDetailExercises = res2.data;
-            });
-        }
-        state.historyDetailExercises = [];
+        state.historyDetailExercises = res.data;
       });
   }
 
@@ -2982,29 +2728,6 @@
     });
   }
 
-  function addSet(exerciseId, exerciseName, reps, weight, note) {
-    withBusy(function () {
-      state.authError = "";
-      var existing = state.sessionSets.filter(function (st) { return st.template_exercise_id === exerciseId; });
-      var setNumber = existing.length + 1;
-      var ex = state.sessionExercises.filter(function (x) { return x.id === exerciseId; })[0];
-      return sb.from("session_sets").insert({
-        user_id: state.user.id,
-        session_id: state.activeSession.id,
-        template_exercise_id: exerciseId,
-        exercise_name: exerciseName,
-        library_exercise_id: (ex && ex.library_exercise_id) || null,
-        set_number: setNumber,
-        reps: reps,
-        weight: weight,
-        note: note || null
-      }).then(function (res) {
-        if (res.error) throw res.error;
-        return loadSessionData(state.activeSession.id, state.activeSession.template_id);
-      });
-    });
-  }
-
   function playFanfare() {
     beep(523, 120);
     setTimeout(function () { beep(659, 120); }, 130);
@@ -3019,62 +2742,22 @@
       var s = state.activeSession;
       var startedAt = s.started_at;
       var templateName = s.template_name;
-      var wasCircuit = isCircuitSession();
       var exerciseCount = state.sessionExercises.length;
-      var setsThisSession = state.sessionSets.slice();
 
       return sb.from("workout_sessions").update({ finished_at: new Date().toISOString() }).eq("id", s.id).select().single()
         .then(function (res) {
           if (res.error) throw res.error;
           var finishedAt = res.data.finished_at;
-
-          var priorBestsPromise = setsThisSession.length > 0
-            ? sb.from("session_sets").select("session_id, exercise_name, library_exercise_id, weight").neq("session_id", s.id)
-            : Promise.resolve({ data: [], error: null });
-
-          return priorBestsPromise.then(function (priorRes) {
-            if (priorRes.error) throw priorRes.error;
-            var priorBest = {};
-            (priorRes.data || []).forEach(function (st) {
-              var w = Number(st.weight) || 0;
-              if (w <= 0) return;
-              var key = prGroupKey(st);
-              if (!priorBest[key] || w > priorBest[key]) priorBest[key] = w;
-            });
-
-            var thisBest = {};
-            setsThisSession.forEach(function (st) {
-              var w = Number(st.weight) || 0;
-              if (w <= 0) return;
-              var key = prGroupKey(st);
-              if (!thisBest[key] || w > thisBest[key].weight) thisBest[key] = { weight: w, exercise: st.exercise_name };
-            });
-
-            var newPRs = [];
-            for (var k in thisBest) {
-              if (!thisBest.hasOwnProperty(k)) continue;
-              if (!priorBest[k] || thisBest[k].weight > priorBest[k]) newPRs.push(thisBest[k]);
-            }
-
-            var totalVolume = setsThisSession.reduce(function (sum, st) {
-              return sum + (Number(st.reps) || 0) * (Number(st.weight) || 0);
-            }, 0);
-
-            state.activeSession = null;
-            return Promise.all([loadTemplates(), loadHistory()]).then(function () {
-              state.sessionSummary = {
-                templateName: templateName,
-                durationText: durationText(startedAt, finishedAt),
-                exerciseCount: exerciseCount,
-                isCircuit: wasCircuit,
-                totalSets: setsThisSession.length,
-                totalVolume: Math.round(totalVolume),
-                newPRs: newPRs,
-                streak: computeStreak()
-              };
-              state.view = "sessionSummary";
-              playFanfare();
-            });
+          state.activeSession = null;
+          return Promise.all([loadTemplates(), loadHistory()]).then(function () {
+            state.sessionSummary = {
+              templateName: templateName,
+              durationText: durationText(startedAt, finishedAt),
+              exerciseCount: exerciseCount,
+              streak: computeStreak()
+            };
+            state.view = "sessionSummary";
+            playFanfare();
           });
         });
     });
@@ -3087,7 +2770,7 @@
   }
 
   function cancelSession() {
-    if (!confirm("Annullare questo allenamento? Le serie già registrate andranno perse e non verrà salvato nelle statistiche.")) return;
+    if (!confirm("Annullare questo allenamento? Non verrà salvato nelle statistiche.")) return;
     withBusy(function () {
       state.authError = "";
       var id = state.activeSession.id;
@@ -3095,7 +2778,6 @@
         if (res.error) throw res.error;
         state.activeSession = null;
         state.sessionExercises = [];
-        state.sessionSets = [];
         state.circuit = null;
         state.view = "home";
       });
@@ -3105,7 +2787,7 @@
   function openHistory() {
     withBusy(function () {
       state.authError = "";
-      return Promise.all([loadHistory(), loadStatsSets()]).then(function () { state.view = "history"; });
+      return loadHistory().then(function () { state.view = "history"; });
     });
   }
 
@@ -3119,12 +2801,6 @@
     });
   }
 
-  function openExerciseProgress(key, label) {
-    state.authError = "";
-    state.currentExerciseProgress = { key: key, label: label };
-    state.view = "exerciseProgress";
-    render();
-  }
 
   function deleteSession(id) {
     if (!confirm("Eliminare questo allenamento dalle statistiche? L'operazione non è reversibile.")) return;
@@ -3578,7 +3254,6 @@
       if (res.error) throw res.error;
       state.activeSession = res.data;
       state.sessionExercises = applyStartOptions(exercisesForSession);
-      state.sessionSets = [];
       initCircuitIfNeeded();
       state.view = "workout";
     });
@@ -3819,13 +3494,6 @@
       var name = form.exname.value.trim();
       var duration = parseInt(form.exduration.value, 10);
       if (name && !isNaN(duration)) { addExercise(name, duration); form.reset(); form.exduration.value = "45"; }
-    } else if (action === "add-set") {
-      var exId = form.getAttribute("data-exercise-id");
-      var exName = form.getAttribute("data-exercise-name");
-      var reps = parseInt(form.reps.value, 10);
-      var weight = parseFloat(form.weight.value);
-      var note = form.note.value.trim();
-      if (!isNaN(reps) && !isNaN(weight)) addSet(exId, exName, reps, weight, note);
     } else if (action === "save-library-exercise") saveLibraryExercise(form);
     else if (action === "save-plan") savePlan(form);
     else if (action === "save-preset-admin") savePresetAdmin(form.name.value.trim(), form.description.value.trim(), form.category.value, form.icon.value.trim());
@@ -3878,7 +3546,6 @@
     else if (action === "dismiss-session-summary") dismissSessionSummary();
     else if (action === "open-history") openHistory();
     else if (action === "open-history-detail") openHistoryDetail(id);
-    else if (action === "open-exercise-progress") openExerciseProgress(el.getAttribute("data-key"), el.getAttribute("data-name"));
     else if (action === "set-theme") setTheme(el.getAttribute("data-theme"));
     else if (action === "open-category") openCategory(el.getAttribute("data-id"));
     else if (action === "open-workout") openWorkout(el.getAttribute("data-kind"), id);

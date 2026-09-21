@@ -354,6 +354,25 @@
     100% { background-position: 150% 0; }
   }
 
+  .session-summary { text-align: center; padding-top: 18px; animation: summary-pop 0.45s cubic-bezier(.2,1.4,.4,1); }
+  .session-summary-mascot { display: flex; justify-content: center; margin-bottom: 8px; }
+  .session-summary-title { font-size: 24px; margin: 4px 0 2px; }
+  .session-summary-sub { color: var(--text-dim); margin: 0 0 4px; font-weight: 600; }
+  .session-summary .stats-row { text-align: left; }
+  .session-summary .section-title { text-align: left; }
+  .session-summary .card { text-align: left; }
+  .session-summary-streak {
+    margin-top: 10px;
+    font-weight: 700;
+    text-align: center;
+    font-size: 15px;
+    background: var(--surface-2);
+  }
+  @keyframes summary-pop {
+    0% { opacity: 0; transform: scale(0.85) translateY(10px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
   /* bottom nav */
   nav.bottom-nav {
     position: fixed;
@@ -899,6 +918,7 @@
     workoutViewMode: "preset",
     currentPresetAdmin: null,
     currentPresetAdminExercises: [],
+    sessionSummary: null,
     dashboardMessages: [],
     currentPlanMessage: null,
     favoriteIds: [],
@@ -1122,7 +1142,7 @@
       return;
     }
 
-    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "categoryDetail", "workoutDetail", "presetAdmin", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEdit", "planMessagesAdmin", "exerciseProgress"];
+    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "categoryDetail", "workoutDetail", "presetAdmin", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEdit", "planMessagesAdmin", "exerciseProgress", "sessionSummary"];
     if (knownViews.indexOf(state.view) === -1) state.view = "plan";
 
     var tabs = ["plan", "home", "benessere", "history"];
@@ -1135,6 +1155,7 @@
       else if (state.view === "home") body = renderHome();
       else if (state.view === "template") body = renderTemplateEditor();
       else if (state.view === "workout") body = renderWorkout();
+      else if (state.view === "sessionSummary") body = renderSessionSummary();
       else if (state.view === "history") body = renderHistory();
       else if (state.view === "historyDetail") body = renderHistoryDetail();
       else if (state.view === "exerciseProgress") body = renderExerciseProgress();
@@ -2327,6 +2348,44 @@
     return html;
   }
 
+  function renderSessionSummary() {
+    var sum = state.sessionSummary;
+    if (!sum) return "";
+    var html = '<div class="session-summary">';
+    html += '<div class="session-summary-mascot">' + mascotBadge(MASCOT_FULL, 90) + '</div>';
+    html += '<h1 class="session-summary-title">Allenamento completato! 🎉</h1>';
+    html += '<p class="session-summary-sub">' + escapeHtml(sum.templateName) + '</p>';
+
+    html += '<div class="stats-row" style="margin-top:18px;">' +
+      '<div class="stat-tile"><span class="num">' + sum.durationText + '</span><span class="lbl">Durata</span></div>' +
+      '<div class="stat-tile"><span class="num">' + sum.exerciseCount + '</span><span class="lbl">Esercizi</span></div>' +
+    '</div>';
+
+    if (!sum.isCircuit && sum.totalSets > 0) {
+      html += '<div class="stats-row">' +
+        '<div class="stat-tile"><span class="num">' + sum.totalSets + '</span><span class="lbl">Serie</span></div>' +
+        '<div class="stat-tile"><span class="num">' + sum.totalVolume + ' kg</span><span class="lbl">Volume totale</span></div>' +
+      '</div>';
+    }
+
+    if (sum.streak > 1) {
+      html += '<div class="card session-summary-streak">🔥 ' + sum.streak + ' giorni di fila!</div>';
+    }
+
+    if (sum.newPRs.length > 0) {
+      html += '<h3 class="section-title">🏆 Nuovi record personali!</h3>';
+      html += '<div class="card"><ul class="set-list">';
+      sum.newPRs.forEach(function (pr) {
+        html += '<li><span class="num">' + escapeHtml(pr.exercise) + '</span><span class="val">' + pr.weight + ' kg</span></li>';
+      });
+      html += '</ul></div>';
+    }
+
+    html += '<button class="btn btn-cta" data-action="dismiss-session-summary" style="margin-top:24px;width:100%;">Fantastico! Continua</button>';
+    html += '</div>';
+    return html;
+  }
+
   function benessereTabPill(key, label) {
     var active = state.benessereTab === key;
     return '<button class="pill' + (active ? " active" : "") + '" data-action="benessere-tab" data-value="' + key + '">' + label + '</button>';
@@ -2946,18 +3005,85 @@
     });
   }
 
+  function playFanfare() {
+    beep(523, 120);
+    setTimeout(function () { beep(659, 120); }, 130);
+    setTimeout(function () { beep(784, 200); }, 260);
+    setTimeout(function () { beep(1047, 380); }, 460);
+    vibrate([70, 40, 70, 40, 220]);
+  }
+
   function finishSession() {
     withBusy(function () {
       state.authError = "";
-      return sb.from("workout_sessions").update({ finished_at: new Date().toISOString() }).eq("id", state.activeSession.id).select().single()
+      var s = state.activeSession;
+      var startedAt = s.started_at;
+      var templateName = s.template_name;
+      var wasCircuit = isCircuitSession();
+      var exerciseCount = state.sessionExercises.length;
+      var setsThisSession = state.sessionSets.slice();
+
+      return sb.from("workout_sessions").update({ finished_at: new Date().toISOString() }).eq("id", s.id).select().single()
         .then(function (res) {
           if (res.error) throw res.error;
-          state.activeSession = null;
-          return Promise.all([loadTemplates(), loadHistory()]);
-        }).then(function () {
-          state.view = "home";
+          var finishedAt = res.data.finished_at;
+
+          var priorBestsPromise = setsThisSession.length > 0
+            ? sb.from("session_sets").select("session_id, exercise_name, library_exercise_id, weight").neq("session_id", s.id)
+            : Promise.resolve({ data: [], error: null });
+
+          return priorBestsPromise.then(function (priorRes) {
+            if (priorRes.error) throw priorRes.error;
+            var priorBest = {};
+            (priorRes.data || []).forEach(function (st) {
+              var w = Number(st.weight) || 0;
+              if (w <= 0) return;
+              var key = prGroupKey(st);
+              if (!priorBest[key] || w > priorBest[key]) priorBest[key] = w;
+            });
+
+            var thisBest = {};
+            setsThisSession.forEach(function (st) {
+              var w = Number(st.weight) || 0;
+              if (w <= 0) return;
+              var key = prGroupKey(st);
+              if (!thisBest[key] || w > thisBest[key].weight) thisBest[key] = { weight: w, exercise: st.exercise_name };
+            });
+
+            var newPRs = [];
+            for (var k in thisBest) {
+              if (!thisBest.hasOwnProperty(k)) continue;
+              if (!priorBest[k] || thisBest[k].weight > priorBest[k]) newPRs.push(thisBest[k]);
+            }
+
+            var totalVolume = setsThisSession.reduce(function (sum, st) {
+              return sum + (Number(st.reps) || 0) * (Number(st.weight) || 0);
+            }, 0);
+
+            state.activeSession = null;
+            return Promise.all([loadTemplates(), loadHistory()]).then(function () {
+              state.sessionSummary = {
+                templateName: templateName,
+                durationText: durationText(startedAt, finishedAt),
+                exerciseCount: exerciseCount,
+                isCircuit: wasCircuit,
+                totalSets: setsThisSession.length,
+                totalVolume: Math.round(totalVolume),
+                newPRs: newPRs,
+                streak: computeStreak()
+              };
+              state.view = "sessionSummary";
+              playFanfare();
+            });
+          });
         });
     });
+  }
+
+  function dismissSessionSummary() {
+    state.sessionSummary = null;
+    state.view = "home";
+    render();
   }
 
   function cancelSession() {
@@ -3749,6 +3875,7 @@
     else if (action === "start-session") startSession(id);
     else if (action === "resume-session") resumeSession();
     else if (action === "finish-session") finishSession();
+    else if (action === "dismiss-session-summary") dismissSessionSummary();
     else if (action === "open-history") openHistory();
     else if (action === "open-history-detail") openHistoryDetail(id);
     else if (action === "open-exercise-progress") openExerciseProgress(el.getAttribute("data-key"), el.getAttribute("data-name"));

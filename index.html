@@ -873,6 +873,8 @@
     libraryExercises: [],
     libraryFilterMuscle: null,
     libraryFilterEquipment: null,
+    libraryFilterText: "",
+    categoryFilterText: "",
     libraryPickMode: false,
     currentLibraryExercise: null,
     libraryForm: null,
@@ -1156,6 +1158,12 @@
     var viewChanged = lastRenderedView !== null && lastRenderedView !== state.view;
     if (viewChanged) viewScrollMemory[lastRenderedView] = window.scrollY;
 
+    var focusedSearch = null;
+    var activeEl = document.activeElement;
+    if (activeEl && activeEl.id === "live-search-input") {
+      focusedSearch = { start: activeEl.selectionStart, end: activeEl.selectionEnd };
+    }
+
     app.innerHTML =
       busyBar() +
       (showNav ? renderScreenHeader(tabTitles[state.view], state.view) : "") +
@@ -1169,6 +1177,14 @@
     Array.prototype.forEach.call(app.querySelectorAll(".pill-row"), function (el, i) {
       if (pillScrollPositions[i] != null) el.scrollLeft = pillScrollPositions[i];
     });
+
+    if (focusedSearch) {
+      var newSearchEl = document.getElementById("live-search-input");
+      if (newSearchEl) {
+        newSearchEl.focus();
+        newSearchEl.setSelectionRange(focusedSearch.start, focusedSearch.end);
+      }
+    }
 
     if (viewChanged) window.scrollTo(0, viewScrollMemory[state.view] || 0);
     lastRenderedView = state.view;
@@ -1519,12 +1535,21 @@
     html += '<h1 class="page-title">' + escapeHtml(cat) + '</h1>';
 
     var myItems = state.templates.filter(function (t) { return (t.category || CATEGORIES[0].key) === cat; });
-    var catalogItems = state.presets.filter(function (p) { return (p.category || CATEGORIES[0].key) === cat; });
-    var orphanItems = myItems.filter(function (t) { return !t.source_preset_id; });
+    var allCatalogItems = state.presets.filter(function (p) { return (p.category || CATEGORIES[0].key) === cat; });
+    var allOrphanItems = myItems.filter(function (t) { return !t.source_preset_id; });
 
-    if (myItems.length === 0 && catalogItems.length === 0) {
+    if (myItems.length === 0 && allCatalogItems.length === 0) {
       html += '<div class="empty">Nessun obiettivo in questa categoria ancora.</div>';
+      return html;
     }
+
+    if (allCatalogItems.length + allOrphanItems.length > 4) {
+      html += '<input type="search" id="live-search-input" data-live-search="category" placeholder="Cerca un obiettivo..." value="' + escapeHtml(state.categoryFilterText) + '" style="margin-bottom:10px;">';
+    }
+
+    var q = (state.categoryFilterText || "").trim().toLowerCase();
+    var catalogItems = q ? allCatalogItems.filter(function (p) { return p.name.toLowerCase().indexOf(q) !== -1; }) : allCatalogItems;
+    var orphanItems = q ? allOrphanItems.filter(function (t) { return t.name.toLowerCase().indexOf(q) !== -1; }) : allOrphanItems;
 
     if (catalogItems.length > 0) {
       html += '<h3 class="section-title" style="margin-top:6px;">Obiettivi pronti</h3>';
@@ -1535,6 +1560,9 @@
     if (orphanItems.length > 0) {
       html += '<h3 class="section-title">I tuoi obiettivi personalizzati</h3>';
       orphanItems.forEach(function (t) { html += workoutCard(t.name, "template", t.id, false, t.image_url); });
+    }
+    if (q && catalogItems.length === 0 && orphanItems.length === 0) {
+      html += '<div class="empty">Nessun obiettivo trovato per "' + escapeHtml(state.categoryFilterText) + '".</div>';
     }
 
     if (isAdmin()) {
@@ -1751,6 +1779,8 @@
     html += '<h1 class="page-title">Libreria esercizi</h1>';
     html += '<p class="page-sub">' + (state.libraryPickMode ? "Scegli un esercizio da aggiungere all'obiettivo" : "Come si fanno e quali muscoli coinvolgono") + '</p>';
 
+    html += '<input type="search" id="live-search-input" data-live-search="library" placeholder="Cerca un esercizio..." value="' + escapeHtml(state.libraryFilterText) + '" style="margin-bottom:10px;">';
+
     html += '<div class="pill-row">' +
       pillButton("Tutti i muscoli", "filter-muscle", "", !state.libraryFilterMuscle) +
       MUSCLE_GROUPS.map(function (m) { return pillButton(m, "filter-muscle", m, state.libraryFilterMuscle === m); }).join("") +
@@ -1767,6 +1797,7 @@
         if (!matchesPrimary && !matchesSecondary) return false;
       }
       if (state.libraryFilterEquipment && ex.equipment !== state.libraryFilterEquipment) return false;
+      if (state.libraryFilterText && ex.name.toLowerCase().indexOf(state.libraryFilterText.trim().toLowerCase()) === -1) return false;
       return true;
     });
 
@@ -3145,6 +3176,7 @@
   function openCategory(key) {
     state.authError = "";
     state.currentCategory = key;
+    state.categoryFilterText = "";
     state.view = "categoryDetail";
     render();
   }
@@ -3502,6 +3534,7 @@
       state.libraryPickMode = pickMode || false;
       state.libraryFilterMuscle = null;
       state.libraryFilterEquipment = null;
+      state.libraryFilterText = "";
       state.view = "library";
       return loadLibraryExercises();
     });
@@ -3771,6 +3804,15 @@
     else if (action === "move-exercise-down") moveTemplateExercise(id, "down");
     else if (action === "move-preset-exercise-up") movePresetExercise(id, "up");
     else if (action === "move-preset-exercise-down") movePresetExercise(id, "down");
+  });
+
+  app.addEventListener("input", function (e) {
+    var el = e.target.closest("[data-live-search]");
+    if (!el) return;
+    var scope = el.getAttribute("data-live-search");
+    if (scope === "library") state.libraryFilterText = el.value;
+    else if (scope === "category") state.categoryFilterText = el.value;
+    render();
   });
 
   app.addEventListener("change", function (e) {

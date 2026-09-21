@@ -2902,7 +2902,7 @@
       state.authError = "";
       return sb.from("workout_sessions").delete().eq("id", id).then(function (res) {
         if (res.error) throw res.error;
-        return Promise.all([loadHistory(), loadStatsSets()]);
+        return loadHistory();
       }).then(function () {
         state.view = "history";
       });

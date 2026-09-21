@@ -1520,6 +1520,18 @@
       : renderPlanGreeting(false);
     html += renderPlanTip();
 
+    var lvl = computeLevel(state.stats.count);
+    html += '<div class="card level-card">' +
+      '<div class="level-card-top">' +
+        '<span class="level-badge">Liv. ' + lvl.level + '</span>' +
+        '<span class="level-title">' + escapeHtml(lvl.title) + '</span>' +
+      '</div>' +
+      (lvl.isMaxLevel
+        ? '<p class="level-progress-label">Livello massimo raggiunto! 🏆</p>'
+        : '<div class="level-progress-bar"><div class="level-progress-fill" style="width:' + lvl.progressPct + '%;"></div></div>' +
+          '<p class="level-progress-label">' + lvl.sessionsToNext + ' allenament' + (lvl.sessionsToNext === 1 ? "o" : "i") + ' al prossimo livello: "' + escapeHtml(lvl.nextTitle) + '"</p>') +
+    '</div>';
+
     html += '<p class="page-sub" style="margin-top:2px;">' +
       (assignedCount > 0 ? completedCount + ' di ' + assignedCount + ' allenamenti fatti questa settimana' : 'La tua settimana tipo') +
     '</p>';
@@ -2389,18 +2401,6 @@
       '<div class="stat-tile"><span class="num">' + state.stats.count + '</span><span class="lbl">Allenamenti</span></div>' +
       '<div class="stat-tile"><span class="num">' + state.stats.hours + '</span><span class="lbl">Ore totali</span></div>' +
       '<div class="stat-tile"><span class="num">' + state.templates.length + '</span><span class="lbl">Obiettivi</span></div>' +
-    '</div>';
-
-    var lvl = computeLevel(state.stats.count);
-    html += '<div class="card level-card">' +
-      '<div class="level-card-top">' +
-        '<span class="level-badge">Liv. ' + lvl.level + '</span>' +
-        '<span class="level-title">' + escapeHtml(lvl.title) + '</span>' +
-      '</div>' +
-      (lvl.isMaxLevel
-        ? '<p class="level-progress-label">Livello massimo raggiunto! 🏆</p>'
-        : '<div class="level-progress-bar"><div class="level-progress-fill" style="width:' + lvl.progressPct + '%;"></div></div>' +
-          '<p class="level-progress-label">' + lvl.sessionsToNext + ' allenament' + (lvl.sessionsToNext === 1 ? "o" : "i") + ' al prossimo livello: "' + escapeHtml(lvl.nextTitle) + '"</p>') +
     '</div>';
 
     html += '<h3 class="section-title">Aspetto</h3>';

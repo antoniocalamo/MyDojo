@@ -1480,7 +1480,20 @@
     var html = '<button class="back-btn" data-action="plan-cancel-edit">←</button>';
     html += '<h1 class="page-title">Modifica il piano</h1><p class="page-sub">Assegna un obiettivo a ogni giorno, oppure lascialo come giorno di riposo.</p>';
 
-    if (state.templates.length === 0) {
+    // Ogni obiettivo del catalogo appare una sola volta: se lo hai già personalizzato,
+    // mostro quello (col nome che gli hai dato); altrimenti mostro il "Base" del catalogo,
+    // che verrà personalizzato in automatico al salvataggio se lo assegni a un giorno.
+    var personalByPreset = {};
+    state.templates.forEach(function (t) { if (t.source_preset_id) personalByPreset[t.source_preset_id] = t; });
+    var options = state.templates
+      .filter(function (t) { return !t.source_preset_id; })
+      .map(function (t) { return { value: "t:" + t.id, name: t.name }; });
+    state.presets.forEach(function (p) {
+      var personal = personalByPreset[p.id];
+      options.push(personal ? { value: "t:" + personal.id, name: personal.name } : { value: "p:" + p.id, name: p.name + " (Base)" });
+    });
+
+    if (options.length === 0) {
       html += '<div class="empty">Non hai ancora nessun obiettivo da assegnare.<br>Creane uno prima nel tab "Corpo".</div>';
       return html;
     }
@@ -1488,12 +1501,12 @@
     html += '<form data-action="save-plan">';
     WEEKDAY_NAMES.forEach(function (name, idx) {
       var assignment = state.weeklyPlan.filter(function (p) { return p.weekday === idx; })[0];
-      var currentTplId = assignment ? assignment.template_id : "";
+      var currentValue = assignment && assignment.template_id ? "t:" + assignment.template_id : "";
       html += '<label>' + name + '</label>';
       html += '<select name="day-' + idx + '">' +
         '<option value="">Riposo (nessun obiettivo)</option>' +
-        state.templates.map(function (t) {
-          return '<option value="' + t.id + '" ' + (currentTplId === t.id ? "selected" : "") + '>' + escapeHtml(t.name) + '</option>';
+        options.map(function (o) {
+          return '<option value="' + o.value + '" ' + (currentValue === o.value ? "selected" : "") + '>' + escapeHtml(o.name) + '</option>';
         }).join("") +
       '</select>';
     });
@@ -2530,19 +2543,46 @@
 
   function editPlan() {
     state.authError = "";
-    state.view = "planEdit";
-    render();
+    withBusy(function () {
+      return loadPresets().then(function () {
+        state.view = "planEdit";
+      });
+    });
   }
 
   function savePlan(form) {
     withBusy(function () {
       state.authError = "";
-      var rows = [];
-      for (var i = 0; i < 7; i++) {
-        var val = form["day-" + i].value;
-        rows.push({ user_id: state.user.id, weekday: i, template_id: val || null });
+      var selections = [];
+      for (var i = 0; i < 7; i++) selections.push(form["day-" + i].value);
+
+      // Un obiettivo "Base" (non ancora personalizzato) scelto per un giorno va prima
+      // trasformato in un obiettivo tuo (stessa cosa che fa il pulsante "Personalizza"),
+      // così weekly_plan continua a puntare sempre e solo a obiettivi personali. Se lo stesso
+      // "Base" è scelto per più giorni nello stesso salvataggio, lo personalizzo una sola volta.
+      var cloningPromises = {};
+      function resolvePresetToTemplateId(presetId) {
+        if (cloningPromises[presetId]) return cloningPromises[presetId];
+        var preset = state.presets.filter(function (p) { return p.id === presetId; })[0];
+        if (!preset) return Promise.resolve(null);
+        cloningPromises[presetId] = sb.from("preset_template_exercises").select("*").eq("preset_template_id", presetId).order("order_index", { ascending: true })
+          .then(function (res) {
+            if (res.error) throw res.error;
+            return clonePresetToPersonal(preset, res.data, preset.category);
+          }).then(function (tpl) { return tpl.id; });
+        return cloningPromises[presetId];
       }
-      return sb.from("weekly_plan").upsert(rows, { onConflict: "user_id,weekday" }).then(function (res) {
+
+      return Promise.all(selections.map(function (val) {
+        if (!val) return null;
+        if (val.indexOf("t:") === 0) return val.slice(2);
+        return resolvePresetToTemplateId(val.slice(2));
+      })).then(function (templateIds) {
+        var rows = templateIds.map(function (tplId, i) {
+          return { user_id: state.user.id, weekday: i, template_id: tplId || null };
+        });
+        return sb.from("weekly_plan").upsert(rows, { onConflict: "user_id,weekday" });
+      }).then(function (res) {
         if (res.error) throw res.error;
         return loadWeeklyPlan();
       }).then(function () {

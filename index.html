@@ -1565,9 +1565,6 @@
       html += '<div class="empty">Nessun obiettivo trovato per "' + escapeHtml(state.categoryFilterText) + '".</div>';
     }
 
-    if (isAdmin()) {
-      html += '<button class="btn btn-ghost" data-action="open-preset-admin" data-id="" style="margin-top:16px;">🛠️ Nuovo obiettivo nel catalogo (admin)</button>';
-    }
     return html;
   }
 
@@ -1822,9 +1819,6 @@
       html += '</div>';
     }
 
-    if (!state.libraryPickMode) {
-      html += '<button class="btn btn-accent" data-action="new-library-exercise" style="margin-top:16px;">+ Aggiungi un tuo esercizio</button>';
-    }
     return html;
   }
 
@@ -1922,18 +1916,8 @@
   function renderTemplateEditor() {
     var t = state.currentTemplate;
     var html = '<button class="back-btn" data-action="open-category" data-id="' + escapeHtml(state.currentCategory || CATEGORIES[0].key) + '">←</button>';
-    html += '<h1 class="page-title">Personalizza obiettivo</h1>';
-
-
-    html += '<form data-action="save-template-name">' +
-      '<label>Nome obiettivo</label>' +
-      '<input type="text" name="name" value="' + escapeHtml(t.name || "") + '" required>' +
-      '<label>Categoria</label>' +
-      '<select name="category">' +
-        CATEGORIES.map(function (c) { return '<option value="' + escapeHtml(c.key) + '" ' + ((t.category || CATEGORIES[0].key) === c.key ? "selected" : "") + '>' + escapeHtml(c.key) + '</option>'; }).join("") +
-      '</select>' +
-      '<button class="btn btn-accent" type="submit">Salva</button>' +
-    '</form>';
+    html += '<h1 class="page-title">Personalizza esercizi</h1>';
+    html += '<p class="page-sub">' + escapeHtml(t.name || "") + '</p>';
 
     html += '<label>Pausa tra un esercizio e l\'altro (secondi)</label>' +
       '<input type="number" class="exercise-duration-input" style="width:70px;" data-action="update-template-rest" value="' + restSecondsFor(t) + '" min="0">';
@@ -1957,11 +1941,6 @@
       });
     }
     html += '<button class="btn btn-ghost btn-small" data-action="open-library-pick" style="margin-top:4px;">📚 Scegli dalla libreria</button>';
-    html += '<form class="inline-add" data-action="add-exercise">' +
-      '<input type="text" name="exname" placeholder="Oppure scrivi un nome libero" required>' +
-      '<input type="number" name="exduration" class="exercise-duration-input" value="45" min="5" required>' +
-      '<button class="btn btn-accent" type="submit">+</button>' +
-    '</form>';
 
     html += '<button class="btn btn-danger" data-action="delete-template" data-id="' + t.id + '" style="margin-top:24px;">Elimina obiettivo</button>';
 
@@ -2591,41 +2570,6 @@
       state.currentCategory = t.category || CATEGORIES[0].key;
       state.view = "template";
       return loadTemplateExercises(id);
-    });
-  }
-
-  function saveTemplateName(name, category) {
-    withBusy(function () {
-      state.authError = "";
-      return sb.from("workout_templates").update({ name: name, category: category }).eq("id", state.currentTemplate.id).select().single()
-        .then(function (res) {
-          if (res.error) throw res.error;
-          state.currentTemplate.name = name;
-          state.currentTemplate.category = category;
-          state.currentCategory = category;
-          return loadTemplates();
-        }).then(function () {
-          showFlash("Obiettivo salvato");
-        });
-    });
-  }
-
-  function addExercise(name, duration) {
-    withBusy(function () {
-      state.authError = "";
-      var orderIndex = state.currentTemplateExercises.length;
-      var matchedLibraryEx = state.libraryExercises.filter(function (le) { return le.name.trim().toLowerCase() === name.trim().toLowerCase(); })[0];
-      return sb.from("template_exercises").insert({
-        user_id: state.user.id,
-        template_id: state.currentTemplate.id,
-        name: name,
-        duration_seconds: duration != null ? duration : 45,
-        library_exercise_id: matchedLibraryEx ? matchedLibraryEx.id : null,
-        order_index: orderIndex
-      }).then(function (res) {
-        if (res.error) throw res.error;
-        return loadTemplateExercises(state.currentTemplate.id);
-      });
     });
   }
 
@@ -3359,13 +3303,6 @@
     render();
   }
 
-  function newLibraryExercise() {
-    state.authError = "";
-    state.libraryForm = { id: null, name: "", muscle_primary: MUSCLE_GROUPS[0], muscles_secondary: [], equipment: EQUIPMENT_TYPES[0], difficulty: "", instructions: "" };
-    state.view = "libraryForm";
-    render();
-  }
-
   function editLibraryExercise(id) {
     var ex = state.libraryExercises.filter(function (x) { return x.id === id; })[0];
     if (!ex) return;
@@ -3489,12 +3426,7 @@
     e.preventDefault();
     var action = form.getAttribute("data-action");
     if (action === "submit-auth") handleSubmitAuth(form);
-    else if (action === "save-template-name") saveTemplateName(form.name.value.trim(), form.category.value);
-    else if (action === "add-exercise") {
-      var name = form.exname.value.trim();
-      var duration = parseInt(form.exduration.value, 10);
-      if (name && !isNaN(duration)) { addExercise(name, duration); form.reset(); form.exduration.value = "45"; }
-    } else if (action === "save-library-exercise") saveLibraryExercise(form);
+    else if (action === "save-library-exercise") saveLibraryExercise(form);
     else if (action === "save-plan") savePlan(form);
     else if (action === "save-preset-admin") savePresetAdmin(form.name.value.trim(), form.description.value.trim(), form.category.value, form.icon.value.trim());
     else if (action === "save-plan-message") savePlanMessage(form.kind.value, form.text.value.trim(), form.active.checked);
@@ -3569,7 +3501,6 @@
     else if (action === "back-to-library") { state.view = "library"; render(); }
     else if (action === "open-library-detail") openLibraryDetail(id);
     else if (action === "pick-library-exercise") pickLibraryExercise(id);
-    else if (action === "new-library-exercise") newLibraryExercise();
     else if (action === "edit-library-exercise") editLibraryExercise(id);
     else if (action === "delete-library-exercise") deleteLibraryExercise(id);
     else if (action === "filter-muscle") { state.libraryFilterMuscle = el.getAttribute("data-value") || null; render(); }

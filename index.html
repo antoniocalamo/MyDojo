@@ -1676,6 +1676,7 @@
         '<div class="plan-day-main' + (clickable ? " clickable" : "") + '"' +
           (clickable ? ' data-action="start-session" data-id="' + d.tpl.id + '"' : '') + '>' +
           (d.tpl && d.tpl.image_url ? '<img class="plan-day-banner" src="' + escapeHtml(d.tpl.image_url) + '" alt="" loading="lazy">' : '') +
+          (!d.tpl ? '<img class="plan-day-banner" src="Banner/Riposo.jpg" alt="" loading="lazy">' : '') +
           '<span class="plan-check' + (d.done ? " done" : "") + '">' + (d.done ? "✓" : "") + '</span>' +
           '<div class="plan-day-info">' +
             '<span class="plan-day-name">' + d.name + (isToday ? ' <span class="tag tag-solid" style="font-size:10px;">Oggi</span>' : '') + '</span>' +

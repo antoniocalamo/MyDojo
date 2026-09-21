@@ -698,9 +698,10 @@
     object-fit: cover;
     -webkit-mask-image: linear-gradient(to right, transparent, rgba(0,0,0,0.85) 60%);
     mask-image: linear-gradient(to right, transparent, rgba(0,0,0,0.85) 60%);
-    opacity: 0.6;
     pointer-events: none;
   }
+  .plan-day-banner.goal { opacity: 0.85; }
+  .plan-day-banner.rest { opacity: 0.35; }
   .plan-check {
     width: 26px;
     height: 26px;
@@ -1675,8 +1676,8 @@
         '<button class="plan-day-edit" data-action="edit-plan-day" data-weekday="' + d.idx + '" title="Cambia obiettivo">✏️</button>' +
         '<div class="plan-day-main' + (clickable ? " clickable" : "") + '"' +
           (clickable ? ' data-action="start-session" data-id="' + d.tpl.id + '"' : '') + '>' +
-          (d.tpl && d.tpl.image_url ? '<img class="plan-day-banner" src="' + escapeHtml(d.tpl.image_url) + '" alt="" loading="lazy">' : '') +
-          (!d.tpl ? '<img class="plan-day-banner" src="Banner/Riposo.jpg" alt="" loading="lazy">' : '') +
+          (d.tpl && d.tpl.image_url ? '<img class="plan-day-banner goal" src="' + escapeHtml(d.tpl.image_url) + '" alt="" loading="lazy">' : '') +
+          (!d.tpl ? '<img class="plan-day-banner rest" src="Banner/Riposo.jpg" alt="" loading="lazy">' : '') +
           '<span class="plan-check' + (d.done ? " done" : "") + '">' + (d.done ? "✓" : "") + '</span>' +
           '<div class="plan-day-info">' +
             '<span class="plan-day-name">' + d.name + (isToday ? ' <span class="tag tag-solid" style="font-size:10px;">Oggi</span>' : '') + '</span>' +

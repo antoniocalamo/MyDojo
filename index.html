@@ -249,6 +249,22 @@
   .stat-tile .num { font-size: 22px; font-weight: 700; display: block; }
   .stat-tile .lbl { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
 
+  .level-card { margin-bottom: 18px; }
+  .level-card-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .level-badge {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 11px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  .level-title { font-size: 15px; font-weight: 700; }
+  .level-progress-bar { width: 100%; height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+  .level-progress-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+  .level-progress-label { font-size: 12px; color: var(--text-dim); margin: 6px 0 0; }
+
   .empty { text-align: center; color: var(--text-dim); padding: 40px 16px; font-size: 14px; }
   .error-msg, .info-msg {
     padding: 12px 14px;
@@ -356,6 +372,23 @@
   @keyframes summary-pop {
     0% { opacity: 0; transform: scale(0.85) translateY(10px); }
     100% { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  .level-up-card {
+    margin: 14px 0 4px;
+    padding: 18px 16px;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, var(--accent), var(--cta));
+    color: var(--accent-ink);
+    text-align: center;
+    animation: level-up-pop 0.5s cubic-bezier(.2,1.6,.4,1) 0.15s backwards;
+  }
+  .level-up-tag { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; margin: 0 0 4px; opacity: 0.85; }
+  .level-up-num { font-size: 26px; font-weight: 700; margin: 0; }
+  .level-up-title { font-size: 16px; font-weight: 700; margin: 2px 0 0; }
+  @keyframes level-up-pop {
+    0% { opacity: 0; transform: scale(0.7); }
+    60% { opacity: 1; transform: scale(1.06); }
+    100% { opacity: 1; transform: scale(1); }
   }
 
   /* bottom nav */
@@ -804,6 +837,39 @@
     { key: "Stretching", emoji: "🤸", banner: "Logo/Categoria Stretching.jpg" },
     { key: "Divertimento", emoji: "🎉", banner: "Logo/Categoria Divertimento.jpg" }
   ];
+
+  var LEVELS = [
+    { threshold: 0, title: "Panda in via d'estinzione" },
+    { threshold: 3, title: "Panda in lista WWF" },
+    { threshold: 7, title: "Panda pigro professionista" },
+    { threshold: 13, title: "Panda che si allena (a volte)" },
+    { threshold: 21, title: "Panda con muscoli nascosti" },
+    { threshold: 31, title: "Panda-guerriero in formazione" },
+    { threshold: 46, title: "Panda cintura nera" },
+    { threshold: 66, title: "Panda leggendario del dojo" },
+    { threshold: 91, title: "Panda temuto dai manubri" },
+    { threshold: 121, title: "Superpredatore Alfa" }
+  ];
+
+  function computeLevel(sessionsDone) {
+    var idx = 0;
+    for (var i = 0; i < LEVELS.length; i++) {
+      if (sessionsDone >= LEVELS[i].threshold) idx = i;
+    }
+    var current = LEVELS[idx];
+    var next = LEVELS[idx + 1] || null;
+    var span = next ? next.threshold - current.threshold : 0;
+    var progressPct = next ? Math.min(100, Math.round((sessionsDone - current.threshold) / span * 100)) : 100;
+    return {
+      level: idx + 1,
+      title: current.title,
+      sessionsDone: sessionsDone,
+      sessionsToNext: next ? next.threshold - sessionsDone : 0,
+      nextTitle: next ? next.title : null,
+      isMaxLevel: !next,
+      progressPct: progressPct
+    };
+  }
 
   var ADMIN_EMAIL = "antonio.calamo@gmail.com";
 
@@ -2119,6 +2185,14 @@
     html += '<h1 class="session-summary-title">Allenamento completato! 🎉</h1>';
     html += '<p class="session-summary-sub">' + escapeHtml(sum.templateName) + '</p>';
 
+    if (sum.leveledUp) {
+      html += '<div class="level-up-card">' +
+        '<p class="level-up-tag">✨ SALITO DI LIVELLO ✨</p>' +
+        '<p class="level-up-num">Livello ' + sum.newLevel + '</p>' +
+        '<p class="level-up-title">' + escapeHtml(sum.newTitle) + '</p>' +
+      '</div>';
+    }
+
     html += '<div class="stats-row" style="margin-top:18px;">' +
       '<div class="stat-tile"><span class="num">' + sum.durationText + '</span><span class="lbl">Durata</span></div>' +
       '<div class="stat-tile"><span class="num">' + sum.exerciseCount + '</span><span class="lbl">Esercizi</span></div>' +
@@ -2285,6 +2359,18 @@
       '<div class="stat-tile"><span class="num">' + state.stats.count + '</span><span class="lbl">Allenamenti</span></div>' +
       '<div class="stat-tile"><span class="num">' + state.stats.hours + '</span><span class="lbl">Ore totali</span></div>' +
       '<div class="stat-tile"><span class="num">' + state.templates.length + '</span><span class="lbl">Obiettivi</span></div>' +
+    '</div>';
+
+    var lvl = computeLevel(state.stats.count);
+    html += '<div class="card level-card">' +
+      '<div class="level-card-top">' +
+        '<span class="level-badge">Liv. ' + lvl.level + '</span>' +
+        '<span class="level-title">' + escapeHtml(lvl.title) + '</span>' +
+      '</div>' +
+      (lvl.isMaxLevel
+        ? '<p class="level-progress-label">Livello massimo raggiunto! 🏆</p>'
+        : '<div class="level-progress-bar"><div class="level-progress-fill" style="width:' + lvl.progressPct + '%;"></div></div>' +
+          '<p class="level-progress-label">' + lvl.sessionsToNext + ' allenament' + (lvl.sessionsToNext === 1 ? "o" : "i") + ' al prossimo livello: "' + escapeHtml(lvl.nextTitle) + '"</p>') +
     '</div>';
 
     html += '<h3 class="section-title">Aspetto</h3>';
@@ -2690,6 +2776,7 @@
       var startedAt = s.started_at;
       var templateName = s.template_name;
       var exerciseCount = state.sessionExercises.length;
+      var levelBefore = computeLevel(state.stats.count).level;
 
       return sb.from("workout_sessions").update({ finished_at: new Date().toISOString() }).eq("id", s.id).select().single()
         .then(function (res) {
@@ -2697,14 +2784,21 @@
           var finishedAt = res.data.finished_at;
           state.activeSession = null;
           return Promise.all([loadTemplates(), loadHistory()]).then(function () {
+            var newLevel = computeLevel(state.stats.count);
             state.sessionSummary = {
               templateName: templateName,
               durationText: durationText(startedAt, finishedAt),
               exerciseCount: exerciseCount,
-              streak: computeStreak()
+              streak: computeStreak(),
+              leveledUp: newLevel.level > levelBefore,
+              newLevel: newLevel.level,
+              newTitle: newLevel.title
             };
             state.view = "sessionSummary";
             playFanfare();
+            if (state.sessionSummary.leveledUp) {
+              setTimeout(function () { beep(1319, 500); vibrate([80, 50, 80, 50, 80, 50, 300]); }, 900);
+            }
           });
         });
     });

@@ -1124,23 +1124,31 @@
     var showNav = tabs.indexOf(state.view) !== -1;
     var tabTitles = { plan: "Il mio piano", home: "Corpo", history: "Statistiche", benessere: "Mente" };
     var body = "";
-    if (state.view === "plan") body = renderPlan();
-    else if (state.view === "planEdit") body = renderPlanEdit();
-    else if (state.view === "home") body = renderHome();
-    else if (state.view === "template") body = renderTemplateEditor();
-    else if (state.view === "workout") body = renderWorkout();
-    else if (state.view === "history") body = renderHistory();
-    else if (state.view === "historyDetail") body = renderHistoryDetail();
-    else if (state.view === "profile") body = renderProfile();
-    else if (state.view === "categoryDetail") body = renderCategoryDetail();
-    else if (state.view === "workoutDetail") body = renderWorkoutDetail();
-    else if (state.view === "presetAdmin") body = renderPresetAdmin();
-    else if (state.view === "benessere") body = renderBenessere();
-    else if (state.view === "library") body = renderLibrary();
-    else if (state.view === "libraryDetail") body = renderLibraryDetail();
-    else if (state.view === "libraryForm") body = renderLibraryForm();
-    else if (state.view === "planMessagesAdmin") body = renderPlanMessagesAdmin();
-    else body = renderHome();
+    try {
+      if (state.view === "plan") body = renderPlan();
+      else if (state.view === "planEdit") body = renderPlanEdit();
+      else if (state.view === "home") body = renderHome();
+      else if (state.view === "template") body = renderTemplateEditor();
+      else if (state.view === "workout") body = renderWorkout();
+      else if (state.view === "history") body = renderHistory();
+      else if (state.view === "historyDetail") body = renderHistoryDetail();
+      else if (state.view === "profile") body = renderProfile();
+      else if (state.view === "categoryDetail") body = renderCategoryDetail();
+      else if (state.view === "workoutDetail") body = renderWorkoutDetail();
+      else if (state.view === "presetAdmin") body = renderPresetAdmin();
+      else if (state.view === "benessere") body = renderBenessere();
+      else if (state.view === "library") body = renderLibrary();
+      else if (state.view === "libraryDetail") body = renderLibraryDetail();
+      else if (state.view === "libraryForm") body = renderLibraryForm();
+      else if (state.view === "planMessagesAdmin") body = renderPlanMessagesAdmin();
+      else body = renderHome();
+    } catch (renderErr) {
+      console.error("[My Dojo] errore imprevisto nel disegnare la schermata:", renderErr);
+      state.view = "home";
+      showNav = false;
+      body = '<div class="empty">Si è verificato un errore imprevisto in questa schermata.</div>' +
+        '<button class="btn btn-cta" data-action="go-home" style="margin-top:12px;">Torna alla home</button>';
+    }
 
     var pillScrollPositions = Array.prototype.map.call(app.querySelectorAll(".pill-row"), function (el) { return el.scrollLeft; });
     var viewChanged = lastRenderedView !== null && lastRenderedView !== state.view;
@@ -1928,7 +1936,7 @@
   }
 
   function renderWorkout() {
-    if (isCircuitSession()) return renderCircuitPlayer();
+    if (isCircuitSession() && state.circuit) return renderCircuitPlayer();
     return renderWorkoutFreeform();
   }
 

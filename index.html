@@ -202,6 +202,34 @@
   .greeting-meta { font-size: 11px; color: var(--text-dim); margin: 4px 0 0; }
   .greeting-tip-inline { font-size: 11.5px; color: var(--text-dim); margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--border); }
 
+  .season-recap-card {
+    position: relative;
+    background: linear-gradient(135deg, var(--accent), var(--cta));
+    color: var(--accent-ink);
+    text-align: center;
+    padding: 16px 30px;
+  }
+  .season-recap-close {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 18px;
+    line-height: 1;
+    color: var(--accent-ink);
+    opacity: 0.7;
+    cursor: pointer;
+    padding: 4px;
+  }
+  .season-recap-msg { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; line-height: 1.35; }
+  .season-recap-msg2 { margin: 0; font-size: 12.5px; font-weight: 600; opacity: 0.85; }
+
+  .season-history-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .season-history-label { margin: 0; font-weight: 700; font-size: 14px; }
+  .season-history-count { margin: 2px 0 0; font-size: 12px; color: var(--text-dim); }
+  .season-history-level { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; text-align: right; }
+
   .plan-top-row { display: flex; align-items: stretch; gap: 10px; margin-bottom: 10px; }
   .plan-top-row .greeting-card { flex: 1; min-width: 0; margin-bottom: 0; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px; }
   .plan-top-row .greeting-card .mascot-badge { width: 32px; height: 32px; }
@@ -893,6 +921,82 @@
     };
   }
 
+  // ---------- stagioni (livello che si azzera ogni trimestre, come le "stagioni" dei giochi online) ----------
+
+  function seasonInfoFromDate(date) {
+    var m = date.getMonth();
+    var y = date.getFullYear();
+    if (m === 11) return { season: "Inverno", year: y + 1 };
+    if (m <= 1) return { season: "Inverno", year: y };
+    if (m <= 4) return { season: "Primavera", year: y };
+    if (m <= 7) return { season: "Estate", year: y };
+    return { season: "Autunno", year: y };
+  }
+
+  function seasonBounds(season, year) {
+    var ranges = {
+      Inverno: [new Date(year - 1, 11, 1), new Date(year, 2, 1)],
+      Primavera: [new Date(year, 2, 1), new Date(year, 5, 1)],
+      Estate: [new Date(year, 5, 1), new Date(year, 8, 1)],
+      Autunno: [new Date(year, 8, 1), new Date(year, 11, 1)]
+    };
+    return { start: ranges[season][0], end: ranges[season][1] };
+  }
+
+  function seasonKey(season, year) { return season + "-" + year; }
+  function seasonLabel(season, year) { return season + " " + year; }
+
+  function getCurrentSeason() {
+    var info = seasonInfoFromDate(new Date());
+    var bounds = seasonBounds(info.season, info.year);
+    return {
+      season: info.season,
+      year: info.year,
+      key: seasonKey(info.season, info.year),
+      label: seasonLabel(info.season, info.year),
+      start: bounds.start,
+      end: bounds.end
+    };
+  }
+
+  function countSessionsInRange(start, end) {
+    return state.history.filter(function (s) {
+      if (!s.finished_at) return false;
+      var d = new Date(s.finished_at);
+      return d >= start && d < end;
+    }).length;
+  }
+
+  function getPastSeasons() {
+    var current = getCurrentSeason();
+    var map = {};
+    state.history.forEach(function (s) {
+      if (!s.finished_at) return;
+      var d = new Date(s.finished_at);
+      var info = seasonInfoFromDate(d);
+      var key = seasonKey(info.season, info.year);
+      if (key === current.key) return;
+      if (!map[key]) {
+        var bounds = seasonBounds(info.season, info.year);
+        map[key] = { season: info.season, year: info.year, key: key, label: seasonLabel(info.season, info.year), start: bounds.start, count: 0 };
+      }
+      map[key].count++;
+    });
+    var list = [];
+    for (var k in map) list.push(map[k]);
+    list.sort(function (a, b) { return b.start - a.start; });
+    list.forEach(function (s) { s.levelInfo = computeLevel(s.count); });
+    return list;
+  }
+
+  function getBestSeasonLevel(currentSeasonLevelInfo) {
+    var best = currentSeasonLevelInfo;
+    getPastSeasons().forEach(function (s) {
+      if (s.levelInfo.level > best.level) best = s.levelInfo;
+    });
+    return best;
+  }
+
   var ADMIN_EMAIL = "antonio.calamo@gmail.com";
 
   var BREATH_TECHNIQUES = {
@@ -1475,9 +1579,12 @@
     var greeting = pickDailyMessage(pool) || (trainedToday ? "Allenamento di oggi fatto! Sei un vero guerriero 🎉" : "Pronto per allenarti oggi?");
     greeting = greeting.replace(/\{streak\}/g, streak);
     var tip = pickDailyMessage(activeMessages.filter(function (m) { return m.kind === "tip"; }));
-    var lvl = computeLevel(state.stats.count);
+    var season = getCurrentSeason();
+    var lvl = computeLevel(countSessionsInRange(season.start, season.end));
+    var best = getBestSeasonLevel(lvl);
 
     var metaBits = [];
+    metaBits.push(season.label);
     metaBits.push(lvl.isMaxLevel ? "Livello massimo 🏆" : lvl.sessionsToNext + " al Liv. " + (lvl.level + 1));
     if (streak > 0) metaBits.push("🔥 " + streak + " giorni di fila");
 
@@ -1491,9 +1598,34 @@
         '</div>' +
         (lvl.isMaxLevel ? '' : '<div class="level-progress-bar"><div class="level-progress-fill" style="width:' + lvl.progressPct + '%;"></div></div>') +
         '<p class="greeting-meta">' + metaBits.join(" · ") + '</p>' +
+        (best.level > lvl.level ? '<p class="greeting-meta">🏆 Record: Liv. ' + best.level + ' · ' + escapeHtml(best.title) + '</p>' : "") +
         (tip ? '<p class="greeting-tip-inline">💡 ' + escapeHtml(tip) + '</p>' : "") +
       '</div>' +
     '</div>';
+  }
+
+  function shouldShowSeasonRecap() {
+    var current = getCurrentSeason();
+    var seen = null;
+    try { seen = localStorage.getItem("mydojo-season-seen"); } catch (e) {}
+    if (seen === current.key) return false;
+    return getPastSeasons().length > 0;
+  }
+
+  function renderSeasonRecap() {
+    var past = getPastSeasons();
+    var lastSeason = past[0];
+    var current = getCurrentSeason();
+    return '<div class="card season-recap-card">' +
+      '<button class="season-recap-close" data-action="dismiss-season-recap">&times;</button>' +
+      '<p class="season-recap-msg">🏁 <strong>' + escapeHtml(lastSeason.label) + '</strong> conclusa: hai raggiunto il Livello ' + lastSeason.levelInfo.level + ' — ' + escapeHtml(lastSeason.levelInfo.title) + '!</p>' +
+      '<p class="season-recap-msg2">Si riparte da zero per ' + escapeHtml(current.label) + ' 🎉</p>' +
+    '</div>';
+  }
+
+  function dismissSeasonRecap() {
+    try { localStorage.setItem("mydojo-season-seen", getCurrentSeason().key); } catch (e) {}
+    render();
   }
 
   function renderPlan() {
@@ -1527,7 +1659,8 @@
       '</div>';
     }
 
-    var html = actionCard
+    var html = shouldShowSeasonRecap() ? renderSeasonRecap() : "";
+    html += actionCard
       ? '<div class="plan-top-row">' + renderPlanTopCard(true) + actionCard + '</div>'
       : renderPlanTopCard(false);
 
@@ -2178,7 +2311,24 @@
       '<div class="stat-tile"><span class="num">' + state.stats.hours + '</span><span class="lbl">Ore totali</span></div>' +
     '</div>';
 
-    html += '<h3 class="section-title" style="margin-top:0;">Costanza</h3>' +
+    var pastSeasons = getPastSeasons();
+    if (pastSeasons.length > 0) {
+      html += '<h3 class="section-title" style="margin-top:0;">Stagioni passate</h3>';
+      pastSeasons.forEach(function (s) {
+        html += '<div class="card season-history-row">' +
+          '<div>' +
+            '<p class="season-history-label">' + escapeHtml(s.label) + '</p>' +
+            '<p class="season-history-count">' + s.count + ' allenament' + (s.count === 1 ? "o" : "i") + '</p>' +
+          '</div>' +
+          '<div class="season-history-level">' +
+            '<span class="level-badge">Liv. ' + s.levelInfo.level + '</span>' +
+            '<span class="level-title-inline">' + escapeHtml(s.levelInfo.title) + '</span>' +
+          '</div>' +
+        '</div>';
+      });
+    }
+
+    html += '<h3 class="section-title"' + (pastSeasons.length > 0 ? "" : ' style="margin-top:0;"') + '>Costanza</h3>' +
       '<p class="page-sub" style="margin:-4px 0 8px;font-size:12.5px;">Un pallino colorato per ogni giorno in cui ti sei allenato, raggruppati per settimana (lun–dom).</p>';
     html += renderHeatmap();
 
@@ -2829,7 +2979,8 @@
       var startedAt = s.started_at;
       var templateName = s.template_name;
       var exerciseCount = state.sessionExercises.length;
-      var levelBefore = computeLevel(state.stats.count).level;
+      var season = getCurrentSeason();
+      var levelBefore = computeLevel(countSessionsInRange(season.start, season.end)).level;
 
       return sb.from("workout_sessions").update({ finished_at: new Date().toISOString() }).eq("id", s.id).select().single()
         .then(function (res) {
@@ -2837,7 +2988,7 @@
           var finishedAt = res.data.finished_at;
           state.activeSession = null;
           return Promise.all([loadTemplates(), loadHistory()]).then(function () {
-            var newLevel = computeLevel(state.stats.count);
+            var newLevel = computeLevel(countSessionsInRange(season.start, season.end));
             state.sessionSummary = {
               templateName: templateName,
               durationText: durationText(startedAt, finishedAt),
@@ -3626,6 +3777,7 @@
     else if (action === "resume-session") resumeSession();
     else if (action === "finish-session") finishSession();
     else if (action === "dismiss-session-summary") dismissSessionSummary();
+    else if (action === "dismiss-season-recap") dismissSeasonRecap();
     else if (action === "open-history") openHistory();
     else if (action === "open-history-detail") openHistoryDetail(id);
     else if (action === "set-theme") setTheme(el.getAttribute("data-theme"));

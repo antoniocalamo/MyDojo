@@ -1971,7 +1971,10 @@
   }
 
   function renderWorkout() {
-    if (isCircuitSession() && state.circuit) return renderCircuitPlayer();
+    if (isCircuitSession()) {
+      if (state.circuit) return renderCircuitPlayer();
+      return '<div class="empty">Allenamento completato...</div>';
+    }
     return renderWorkoutFreeform();
   }
 

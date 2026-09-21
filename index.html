@@ -184,30 +184,31 @@
     margin-bottom: 10px;
   }
   .greeting-card .mascot-badge { width: 48px; height: 48px; flex-shrink: 0; }
-  .greeting-text { min-width: 0; }
-  .greeting-msg { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.3; }
-  .greeting-streak {
-    display: inline-block;
-    margin-top: 6px;
+  .greeting-text { min-width: 0; flex: 1; }
+  .greeting-msg { margin: 0 0 6px; font-size: 14px; font-weight: 700; line-height: 1.3; }
+  .greeting-level-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .level-badge {
+    flex-shrink: 0;
     font-size: 11px;
     font-weight: 700;
     padding: 3px 9px;
     border-radius: 999px;
-    background: var(--surface-2);
-    color: var(--text);
+    background: var(--accent);
+    color: var(--accent-ink);
   }
-  .greeting-tip {
-    font-size: 12.5px;
-    color: var(--text-dim);
-    margin: 0 0 14px;
-    padding: 0 4px;
-  }
+  .level-title-inline { font-size: 12.5px; font-weight: 700; }
+  .level-progress-bar { width: 100%; height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-top: 6px; }
+  .level-progress-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+  .greeting-meta { font-size: 11px; color: var(--text-dim); margin: 4px 0 0; }
+  .greeting-tip-inline { font-size: 11.5px; color: var(--text-dim); margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--border); }
 
   .plan-top-row { display: flex; align-items: stretch; gap: 10px; margin-bottom: 10px; }
   .plan-top-row .greeting-card { flex: 1; min-width: 0; margin-bottom: 0; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px; }
   .plan-top-row .greeting-card .mascot-badge { width: 32px; height: 32px; }
-  .plan-top-row .greeting-card .greeting-msg { font-size: 12px; line-height: 1.25; }
-  .plan-top-row .greeting-card .greeting-streak { font-size: 10px; padding: 2px 7px; margin-top: 4px; }
+  .plan-top-row .greeting-card .greeting-msg { font-size: 12px; line-height: 1.25; margin-bottom: 4px; }
+  .plan-top-row .greeting-card .level-title-inline,
+  .plan-top-row .greeting-card .greeting-meta,
+  .plan-top-row .greeting-card .greeting-tip-inline { display: none; }
   .plan-action-card {
     flex: 1;
     min-width: 0;
@@ -248,22 +249,6 @@
   }
   .stat-tile .num { font-size: 22px; font-weight: 700; display: block; }
   .stat-tile .lbl { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
-
-  .level-card { margin-bottom: 18px; }
-  .level-card-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
-  .level-badge {
-    flex-shrink: 0;
-    font-size: 12px;
-    font-weight: 700;
-    padding: 4px 11px;
-    border-radius: 999px;
-    background: var(--accent);
-    color: var(--accent-ink);
-  }
-  .level-title { font-size: 15px; font-weight: 700; }
-  .level-progress-bar { width: 100%; height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
-  .level-progress-fill { height: 100%; background: var(--accent); border-radius: 999px; }
-  .level-progress-label { font-size: 12px; color: var(--text-dim); margin: 6px 0 0; }
 
   .empty { text-align: center; color: var(--text-dim); padding: 40px 16px; font-size: 14px; }
   .error-msg, .info-msg {
@@ -1461,27 +1446,33 @@
     return list[idx].text;
   }
 
-  function renderPlanGreeting(compact) {
+  function renderPlanTopCard(compact) {
     var trainedToday = hasTrainedToday();
     var streak = computeStreak();
     var activeMessages = state.dashboardMessages.filter(function (m) { return m.active; });
     var pool = activeMessages.filter(function (m) { return m.kind === (trainedToday ? "greeting_done" : "greeting_pending"); });
     var greeting = pickDailyMessage(pool) || (trainedToday ? "Allenamento di oggi fatto! Sei un vero guerriero 🎉" : "Pronto per allenarti oggi?");
     greeting = greeting.replace(/\{streak\}/g, streak);
+    var tip = pickDailyMessage(activeMessages.filter(function (m) { return m.kind === "tip"; }));
+    var lvl = computeLevel(state.stats.count);
+
+    var metaBits = [];
+    metaBits.push(lvl.isMaxLevel ? "Livello massimo 🏆" : lvl.sessionsToNext + " al Liv. " + (lvl.level + 1));
+    if (streak > 0) metaBits.push("🔥 " + streak + " giorni di fila");
 
     return '<div class="greeting-card">' +
       mascotBadge(MASCOT_HEAD, compact ? 60 : 76) +
       '<div class="greeting-text">' +
         '<p class="greeting-msg">' + escapeHtml(greeting) + '</p>' +
-        (streak > 0 ? '<span class="greeting-streak">🔥 ' + streak + ' giorni di fila</span>' : '') +
+        '<div class="greeting-level-row">' +
+          '<span class="level-badge">Liv. ' + lvl.level + '</span>' +
+          '<span class="level-title-inline">' + escapeHtml(lvl.title) + '</span>' +
+        '</div>' +
+        (lvl.isMaxLevel ? '' : '<div class="level-progress-bar"><div class="level-progress-fill" style="width:' + lvl.progressPct + '%;"></div></div>') +
+        '<p class="greeting-meta">' + metaBits.join(" · ") + '</p>' +
+        (tip ? '<p class="greeting-tip-inline">💡 ' + escapeHtml(tip) + '</p>' : "") +
       '</div>' +
     '</div>';
-  }
-
-  function renderPlanTip() {
-    var activeMessages = state.dashboardMessages.filter(function (m) { return m.active; });
-    var tip = pickDailyMessage(activeMessages.filter(function (m) { return m.kind === "tip"; }));
-    return tip ? '<p class="greeting-tip">💡 ' + escapeHtml(tip) + '</p>' : '';
   }
 
   function renderPlan() {
@@ -1516,21 +1507,8 @@
     }
 
     var html = actionCard
-      ? '<div class="plan-top-row">' + renderPlanGreeting(true) + actionCard + '</div>'
-      : renderPlanGreeting(false);
-    html += renderPlanTip();
-
-    var lvl = computeLevel(state.stats.count);
-    html += '<div class="card level-card">' +
-      '<div class="level-card-top">' +
-        '<span class="level-badge">Liv. ' + lvl.level + '</span>' +
-        '<span class="level-title">' + escapeHtml(lvl.title) + '</span>' +
-      '</div>' +
-      (lvl.isMaxLevel
-        ? '<p class="level-progress-label">Livello massimo raggiunto! 🏆</p>'
-        : '<div class="level-progress-bar"><div class="level-progress-fill" style="width:' + lvl.progressPct + '%;"></div></div>' +
-          '<p class="level-progress-label">' + lvl.sessionsToNext + ' allenament' + (lvl.sessionsToNext === 1 ? "o" : "i") + ' al prossimo livello: "' + escapeHtml(lvl.nextTitle) + '"</p>') +
-    '</div>';
+      ? '<div class="plan-top-row">' + renderPlanTopCard(true) + actionCard + '</div>'
+      : renderPlanTopCard(false);
 
     html += '<p class="page-sub" style="margin-top:2px;">' +
       (assignedCount > 0 ? completedCount + ' di ' + assignedCount + ' allenamenti fatti questa settimana' : 'La tua settimana tipo') +

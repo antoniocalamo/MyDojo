@@ -924,21 +924,21 @@
   // ---------- stagioni (livello che si azzera ogni trimestre, come le "stagioni" dei giochi online) ----------
 
   function seasonInfoFromDate(date) {
-    var m = date.getMonth();
     var y = date.getFullYear();
-    if (m === 11) return { season: "Inverno", year: y + 1 };
-    if (m <= 1) return { season: "Inverno", year: y };
-    if (m <= 4) return { season: "Primavera", year: y };
-    if (m <= 7) return { season: "Estate", year: y };
-    return { season: "Autunno", year: y };
+    var md = date.getMonth() * 100 + date.getDate();
+    if (md >= 1121) return { season: "Inverno", year: y + 1 };
+    if (md >= 821) return { season: "Autunno", year: y };
+    if (md >= 521) return { season: "Estate", year: y };
+    if (md >= 220) return { season: "Primavera", year: y };
+    return { season: "Inverno", year: y };
   }
 
   function seasonBounds(season, year) {
     var ranges = {
-      Inverno: [new Date(year - 1, 11, 1), new Date(year, 2, 1)],
-      Primavera: [new Date(year, 2, 1), new Date(year, 5, 1)],
-      Estate: [new Date(year, 5, 1), new Date(year, 8, 1)],
-      Autunno: [new Date(year, 8, 1), new Date(year, 11, 1)]
+      Inverno: [new Date(year - 1, 11, 21), new Date(year, 2, 20)],
+      Primavera: [new Date(year, 2, 20), new Date(year, 5, 21)],
+      Estate: [new Date(year, 5, 21), new Date(year, 8, 21)],
+      Autunno: [new Date(year, 8, 21), new Date(year, 11, 21)]
     };
     return { start: ranges[season][0], end: ranges[season][1] };
   }

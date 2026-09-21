@@ -326,10 +326,12 @@
   .heatmap-cell.trained { background: var(--cta); }
   .heatmap-cell.future { visibility: hidden; }
 
-  .set-form { display: flex; gap: 8px; align-items: flex-end; margin-top: 10px; }
+  .set-form { margin-top: 10px; }
+  .set-form-row { display: flex; gap: 8px; align-items: flex-end; }
   .set-form .field { flex: 1; }
   .set-form input { margin-bottom: 0; }
-  .set-form button { width: auto; padding: 13px 16px; }
+  .set-form-row button { width: auto; padding: 13px 16px; }
+  .set-form input[name="note"] { margin-top: 8px; font-size: 13px; }
 
   .link-btn { background: none; border: none; color: var(--accent); font-size: 14px; font-weight: 600; cursor: pointer; padding: 4px 0; }
 
@@ -2056,15 +2058,18 @@
       if (sets.length > 0) {
         html += '<ul class="set-list">';
         sets.forEach(function (st) {
-          html += '<li><span class="num">Serie ' + st.set_number + '</span><span class="val">' + st.reps + ' rip. × ' + st.weight + ' kg</span></li>';
+          html += '<li><span class="num">Serie ' + st.set_number + (st.note ? ' · ' + escapeHtml(st.note) : '') + '</span><span class="val">' + st.reps + ' rip. × ' + st.weight + ' kg</span></li>';
         });
         html += '</ul>';
       }
 
       html += '<form class="set-form" data-action="add-set" data-exercise-id="' + ex.id + '" data-exercise-name="' + escapeHtml(ex.name) + '">' +
-        '<div class="field"><label>Ripetizioni</label><input type="number" name="reps" min="0" required></div>' +
-        '<div class="field"><label>Peso (kg)</label><input type="number" name="weight" min="0" step="0.5" required></div>' +
-        '<button class="btn btn-accent" type="submit">+</button>' +
+        '<div class="set-form-row">' +
+          '<div class="field"><label>Ripetizioni</label><input type="number" name="reps" min="0" required></div>' +
+          '<div class="field"><label>Peso (kg)</label><input type="number" name="weight" min="0" step="0.5" required></div>' +
+          '<button class="btn btn-accent" type="submit">+</button>' +
+        '</div>' +
+        '<input type="text" name="note" placeholder="Nota (facoltativa), es. presa larga" maxlength="140">' +
       '</form>' +
       '</div>';
     });
@@ -2307,7 +2312,7 @@
       order.forEach(function (name) {
         html += '<div class="card"><p style="font-weight:700;margin:0 0 4px;">' + escapeHtml(name) + '</p><ul class="set-list">';
         byExercise[name].forEach(function (st) {
-          html += '<li><span class="num">Serie ' + st.set_number + '</span><span class="val">' + st.reps + ' rip. × ' + st.weight + ' kg</span></li>';
+          html += '<li><span class="num">Serie ' + st.set_number + (st.note ? ' · ' + escapeHtml(st.note) : '') + '</span><span class="val">' + st.reps + ' rip. × ' + st.weight + ' kg</span></li>';
         });
         html += '</ul></div>';
       });
@@ -2915,7 +2920,7 @@
     });
   }
 
-  function addSet(exerciseId, exerciseName, reps, weight) {
+  function addSet(exerciseId, exerciseName, reps, weight, note) {
     withBusy(function () {
       state.authError = "";
       var existing = state.sessionSets.filter(function (st) { return st.template_exercise_id === exerciseId; });
@@ -2929,7 +2934,8 @@
         library_exercise_id: (ex && ex.library_exercise_id) || null,
         set_number: setNumber,
         reps: reps,
-        weight: weight
+        weight: weight,
+        note: note || null
       }).then(function (res) {
         if (res.error) throw res.error;
         return loadSessionData(state.activeSession.id, state.activeSession.template_id);
@@ -3689,7 +3695,8 @@
       var exName = form.getAttribute("data-exercise-name");
       var reps = parseInt(form.reps.value, 10);
       var weight = parseFloat(form.weight.value);
-      if (!isNaN(reps) && !isNaN(weight)) addSet(exId, exName, reps, weight);
+      var note = form.note.value.trim();
+      if (!isNaN(reps) && !isNaN(weight)) addSet(exId, exName, reps, weight, note);
     } else if (action === "save-library-exercise") saveLibraryExercise(form);
     else if (action === "save-plan") savePlan(form);
     else if (action === "save-preset-admin") savePresetAdmin(form.name.value.trim(), form.description.value.trim(), form.category.value, form.icon.value.trim());

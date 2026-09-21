@@ -885,6 +885,7 @@
     historyDetail: null,
     historyDetailSets: [],
     historyDetailExercises: [],
+    currentExerciseProgress: null,
     presets: [],
     currentPresetExercises: [],
     currentCategory: null,
@@ -1117,7 +1118,7 @@
       return;
     }
 
-    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "categoryDetail", "workoutDetail", "presetAdmin", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEdit", "planMessagesAdmin"];
+    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "categoryDetail", "workoutDetail", "presetAdmin", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEdit", "planMessagesAdmin", "exerciseProgress"];
     if (knownViews.indexOf(state.view) === -1) state.view = "plan";
 
     var tabs = ["plan", "home", "benessere", "history"];
@@ -1132,6 +1133,7 @@
       else if (state.view === "workout") body = renderWorkout();
       else if (state.view === "history") body = renderHistory();
       else if (state.view === "historyDetail") body = renderHistoryDetail();
+      else if (state.view === "exerciseProgress") body = renderExerciseProgress();
       else if (state.view === "profile") body = renderProfile();
       else if (state.view === "categoryDetail") body = renderCategoryDetail();
       else if (state.view === "workoutDetail") body = renderWorkoutDetail();
@@ -2128,7 +2130,7 @@
       if (w <= 0) return;
       var key = prGroupKey(st);
       if (!best[key] || w > best[key].weight) {
-        best[key] = { exercise: st.exercise_name, weight: w, reps: st.reps, date: st.created_at };
+        best[key] = { key: key, exercise: st.exercise_name, weight: w, reps: st.reps, date: st.created_at };
       }
     });
     var list = [];
@@ -2144,8 +2146,65 @@
     }
     var html = '<div class="card"><ul class="set-list">';
     prs.forEach(function (p) {
-      html += '<li><span class="num">' + escapeHtml(p.exercise) + '</span><span class="val">' +
-        p.weight + ' kg × ' + p.reps + ' rip. · ' + shortDate(p.date) + '</span></li>';
+      html += '<li data-action="open-exercise-progress" data-key="' + escapeHtml(p.key) + '" data-name="' + escapeHtml(p.exercise) + '" style="cursor:pointer;">' +
+        '<span class="num">' + escapeHtml(p.exercise) + '</span><span class="val">' +
+        p.weight + ' kg × ' + p.reps + ' rip. · ' + shortDate(p.date) + ' ›</span></li>';
+    });
+    html += '</ul></div>';
+    return html;
+  }
+
+  function computeExerciseHistory(key) {
+    var byDate = {};
+    state.statsSets.forEach(function (st) {
+      if (prGroupKey(st) !== key) return;
+      var w = Number(st.weight) || 0;
+      if (w <= 0) return;
+      var d = dateKey(new Date(st.created_at));
+      if (!byDate[d] || w > byDate[d].weight) {
+        byDate[d] = { date: st.created_at, weight: w, reps: st.reps };
+      }
+    });
+    var list = [];
+    for (var k in byDate) { if (byDate.hasOwnProperty(k)) list.push(byDate[k]); }
+    list.sort(function (a, b) { return new Date(a.date) - new Date(b.date); });
+    return list;
+  }
+
+  function renderExerciseProgress() {
+    var info = state.currentExerciseProgress;
+    var data = computeExerciseHistory(info.key);
+    var html = '<button class="back-btn" data-action="open-history">←</button>';
+    html += '<h1 class="page-title">' + escapeHtml(info.label) + '</h1>';
+    html += '<p class="page-sub">Andamento del peso nel tempo</p>';
+
+    if (data.length === 0) {
+      html += '<div class="card"><div class="empty" style="padding:16px;">Nessuna serie con peso registrata per questo esercizio.</div></div>';
+    } else if (data.length === 1) {
+      html += '<div class="card"><div class="empty" style="padding:16px;">Serve almeno un secondo allenamento con questo esercizio per vedere un grafico.</div></div>';
+    } else {
+      var w = 300, h = 120, padBottom = 20, padTop = 10;
+      var maxW = Math.max.apply(null, data.map(function (d) { return d.weight; }));
+      var barGap = 6;
+      var barWidth = (w - barGap * (data.length - 1)) / data.length;
+      var svg = "";
+      data.forEach(function (d, i) {
+        var barH = Math.max(2, Math.round((d.weight / maxW) * (h - padTop - padBottom)));
+        var x = i * (barWidth + barGap);
+        var y = h - padBottom - barH;
+        var label = shortDate(d.date);
+        svg += '<rect x="' + x.toFixed(1) + '" y="' + y + '" width="' + barWidth.toFixed(1) + '" height="' + barH +
+          '" rx="3" style="fill:var(--cta);"><title>' + label + ': ' + d.weight + ' kg × ' + d.reps + ' rip.</title></rect>';
+        svg += '<text x="' + (x + barWidth / 2).toFixed(1) + '" y="' + (h - 4) +
+          '" font-size="8" text-anchor="middle" style="fill:var(--text-dim);">' + label + '</text>';
+      });
+      html += '<div class="card"><svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:120px;overflow:visible;display:block;">' + svg + '</svg></div>';
+    }
+
+    html += '<h3 class="section-title">Storico serie</h3>';
+    html += '<div class="card"><ul class="set-list">';
+    data.slice().reverse().forEach(function (d) {
+      html += '<li><span class="num">' + shortDate(d.date) + '</span><span class="val">' + d.weight + ' kg × ' + d.reps + ' rip.</span></li>';
     });
     html += '</ul></div>';
     return html;
@@ -2892,6 +2951,13 @@
       state.view = "historyDetail";
       return loadHistoryDetail(id, s.template_id);
     });
+  }
+
+  function openExerciseProgress(key, label) {
+    state.authError = "";
+    state.currentExerciseProgress = { key: key, label: label };
+    state.view = "exerciseProgress";
+    render();
   }
 
   function deleteSession(id) {
@@ -3642,6 +3708,7 @@
     else if (action === "finish-session") finishSession();
     else if (action === "open-history") openHistory();
     else if (action === "open-history-detail") openHistoryDetail(id);
+    else if (action === "open-exercise-progress") openExerciseProgress(el.getAttribute("data-key"), el.getAttribute("data-name"));
     else if (action === "set-theme") setTheme(el.getAttribute("data-theme"));
     else if (action === "open-category") openCategory(el.getAttribute("data-id"));
     else if (action === "open-workout") openWorkout(el.getAttribute("data-kind"), id);

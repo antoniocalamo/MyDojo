@@ -965,34 +965,79 @@
     }).length;
   }
 
+  function seasonStatsRow(key) {
+    return state.seasonStats.filter(function (r) { return r.season_key === key; })[0] || null;
+  }
+
   function getPastSeasons() {
     var current = getCurrentSeason();
-    var map = {};
-    state.history.forEach(function (s) {
-      if (!s.finished_at) return;
-      var d = new Date(s.finished_at);
-      var info = seasonInfoFromDate(d);
-      var key = seasonKey(info.season, info.year);
-      if (key === current.key) return;
-      if (!map[key]) {
-        var bounds = seasonBounds(info.season, info.year);
-        map[key] = { season: info.season, year: info.year, key: key, label: seasonLabel(info.season, info.year), start: bounds.start, count: 0 };
-      }
-      map[key].count++;
-    });
-    var list = [];
-    for (var k in map) list.push(map[k]);
-    list.sort(function (a, b) { return b.start - a.start; });
-    list.forEach(function (s) { s.levelInfo = computeLevel(s.count); });
-    return list;
+    return state.seasonStats
+      .filter(function (r) { return r.season_key !== current.key; })
+      .map(function (r) {
+        var bounds = seasonBounds(r.season, r.year);
+        return { key: r.season_key, season: r.season, year: r.year, label: seasonLabel(r.season, r.year), start: bounds.start, count: r.sessions_count, levelInfo: computeLevel(r.sessions_count) };
+      })
+      .sort(function (a, b) { return b.start - a.start; });
   }
 
   function getBestSeasonLevel(currentSeasonLevelInfo) {
     var best = currentSeasonLevelInfo;
-    getPastSeasons().forEach(function (s) {
-      if (s.levelInfo.level > best.level) best = s.levelInfo;
+    state.seasonStats.forEach(function (r) {
+      var lvl = computeLevel(r.sessions_count);
+      if (lvl.level > best.level) best = lvl;
     });
     return best;
+  }
+
+  function loadSeasonStats() {
+    return sb.from("season_stats").select("*").then(function (res) {
+      if (res.error) throw res.error;
+      state.seasonStats = res.data;
+    });
+  }
+
+  function syncSeasonStats() {
+    var keys = {};
+    state.history.forEach(function (s) {
+      if (!s.finished_at) return;
+      var info = seasonInfoFromDate(new Date(s.finished_at));
+      keys[seasonKey(info.season, info.year)] = info;
+    });
+    var current = getCurrentSeason();
+    keys[current.key] = { season: current.season, year: current.year };
+
+    var rows = [];
+    for (var key in keys) {
+      var info = keys[key];
+      var bounds = seasonBounds(info.season, info.year);
+      var count = countSessionsInRange(bounds.start, bounds.end);
+      var existing = seasonStatsRow(key);
+      if (existing && existing.sessions_count === count) continue;
+      var lvl = computeLevel(count);
+      rows.push({
+        user_id: state.user.id,
+        season_key: key,
+        season: info.season,
+        year: info.year,
+        sessions_count: count,
+        level: lvl.level,
+        title: lvl.title,
+        updated_at: new Date().toISOString()
+      });
+    }
+    if (rows.length === 0) return Promise.resolve();
+    return sb.from("season_stats").upsert(rows, { onConflict: "user_id,season_key" }).select()
+      .then(function (res) {
+        if (res.error) throw res.error;
+        rows.forEach(function (row) {
+          var idx = -1;
+          for (var i = 0; i < state.seasonStats.length; i++) {
+            if (state.seasonStats[i].season_key === row.season_key) { idx = i; break; }
+          }
+          if (idx === -1) state.seasonStats.push(row);
+          else state.seasonStats[idx] = row;
+        });
+      });
   }
 
   var ADMIN_EMAIL = "antonio.calamo@gmail.com";
@@ -1096,6 +1141,7 @@
     workoutStartOptions: { warmup: false, silent: false },
     circuit: null,
     stats: { count: 0, hours: 0 },
+    seasonStats: [],
     busy: false,
     benessereTab: "respiro",
     breathing: null,
@@ -1578,7 +1624,8 @@
     greeting = greeting.replace(/\{streak\}/g, streak);
     var tip = pickDailyMessage(activeMessages.filter(function (m) { return m.kind === "tip"; }));
     var season = getCurrentSeason();
-    var lvl = computeLevel(countSessionsInRange(season.start, season.end));
+    var seasonRow = seasonStatsRow(season.key);
+    var lvl = computeLevel(seasonRow ? seasonRow.sessions_count : 0);
     var best = getBestSeasonLevel(lvl);
 
     var metaBits = [];
@@ -2660,7 +2707,9 @@
           if (s.finished_at) totalMs += new Date(s.finished_at) - new Date(s.started_at);
         });
         state.stats = { count: count, hours: Math.round((totalMs / 3600000) * 10) / 10 };
-      });
+      })
+      .then(loadSeasonStats)
+      .then(syncSeasonStats);
   }
 
   function loadHistoryDetail(sessionId, templateId) {
@@ -2985,7 +3034,8 @@
           var finishedAt = res.data.finished_at;
           state.activeSession = null;
           return Promise.all([loadTemplates(), loadHistory()]).then(function () {
-            var newLevel = computeLevel(countSessionsInRange(season.start, season.end));
+            var seasonRow = seasonStatsRow(season.key);
+            var newLevel = computeLevel(seasonRow ? seasonRow.sessions_count : 0);
             state.sessionSummary = {
               templateName: templateName,
               durationText: durationText(startedAt, finishedAt),

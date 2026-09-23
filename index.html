@@ -398,6 +398,8 @@
   .level-up-tag { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; margin: 0 0 4px; opacity: 0.85; }
   .level-up-num { font-size: 26px; font-weight: 700; margin: 0; }
   .level-up-title { font-size: 16px; font-weight: 700; margin: 2px 0 0; }
+  .series-rest-banner { width: 100%; max-width: 260px; border-radius: var(--radius-lg); margin: 0 auto 12px; display: block; }
+  .series-rest-next { color: var(--text-dim); font-size: 14px; margin-top: 4px; }
   @keyframes level-up-pop {
     0% { opacity: 0; transform: scale(0.7); }
     60% { opacity: 1; transform: scale(1.06); }
@@ -1140,6 +1142,9 @@
     favoriteIds: [],
     workoutStartOptions: { warmup: false, silent: false },
     circuit: null,
+    activeSeries: null,
+    seriesRest: null,
+    planPreviewWeekday: null,
     stats: { count: 0, hours: 0 },
     seasonStats: [],
     busy: false,
@@ -1359,7 +1364,7 @@
       return;
     }
 
-    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "categoryDetail", "workoutDetail", "presetAdmin", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEditDay", "planMessagesAdmin", "sessionSummary"];
+    var knownViews = ["home", "template", "workout", "history", "historyDetail", "profile", "categoryDetail", "workoutDetail", "presetAdmin", "benessere", "library", "libraryDetail", "libraryForm", "plan", "planEditDay", "planDayPreview", "planMessagesAdmin", "sessionSummary", "seriesRest"];
     if (knownViews.indexOf(state.view) === -1) state.view = "plan";
 
     var tabs = ["plan", "home", "benessere", "history"];
@@ -1369,6 +1374,8 @@
     try {
       if (state.view === "plan") body = renderPlan();
       else if (state.view === "planEditDay") body = renderPlanEditDay();
+      else if (state.view === "planDayPreview") body = renderPlanDayPreview();
+      else if (state.view === "seriesRest") body = renderSeriesRest();
       else if (state.view === "home") body = renderHome();
       else if (state.view === "template") body = renderTemplateEditor();
       else if (state.view === "workout") body = renderWorkout();
@@ -1678,15 +1685,19 @@
 
     var assignedCount = 0, completedCount = 0, missedDay = null;
     var dayEntries = WEEKDAY_NAMES.map(function (name, idx) {
-      var assignment = state.weeklyPlan.filter(function (p) { return p.weekday === idx; })[0];
-      var tpl = assignment && assignment.template_id ? state.templates.filter(function (t) { return t.id === assignment.template_id; })[0] : null;
-      var done = tpl ? isDayCompleted(tpl.id) : false;
-      if (tpl) {
+      var assignments = state.weeklyPlan.filter(function (p) { return p.weekday === idx; })
+        .sort(function (a, b) { return (a.order_index || 0) - (b.order_index || 0); });
+      var tpls = assignments.map(function (a) {
+        return state.templates.filter(function (t) { return t.id === a.template_id; })[0];
+      }).filter(Boolean);
+      var tpl = tpls[0] || null;
+      var done = tpls.length > 0 && tpls.every(function (t) { return isDayCompleted(t.id); });
+      if (tpls.length > 0) {
         assignedCount++;
         if (done) completedCount++;
-        else if (idx < todayIdx && !missedDay) missedDay = { name: name, tpl: tpl };
+        else if (idx < todayIdx && !missedDay) missedDay = { name: name, idx: idx, tpls: tpls };
       }
-      return { name: name, idx: idx, tpl: tpl, done: done };
+      return { name: name, idx: idx, tpl: tpl, tpls: tpls, done: done };
     });
 
     var actionCard = "";
@@ -1697,9 +1708,14 @@
         '<p class="action-meta">Iniziato il ' + formatDate(state.activeSession.started_at) + ' — tocca per riprendere</p>' +
       '</div>';
     } else if (missedDay) {
-      actionCard = '<div class="plan-action-card" style="background:' + gradientFor(missedDay.tpl.id) + ';" data-action="start-session" data-id="' + missedDay.tpl.id + '">' +
+      var missedIsSeries = missedDay.tpls.length > 1;
+      var missedFirst = missedDay.tpls[0];
+      var missedAction = missedIsSeries
+        ? 'data-action="preview-plan-day" data-weekday="' + missedDay.idx + '"'
+        : 'data-action="start-session" data-id="' + missedFirst.id + '"';
+      actionCard = '<div class="plan-action-card" style="background:' + gradientFor(missedFirst.id) + ';" ' + missedAction + '>' +
         '<span class="tag tag-solid">⏱️ Recupero</span>' +
-        '<p class="action-title">' + escapeHtml(missedDay.tpl.name) + '</p>' +
+        '<p class="action-title">' + escapeHtml(missedFirst.name) + (missedIsSeries ? ' +' + (missedDay.tpls.length - 1) + ' altri' : '') + '</p>' +
         '<p class="action-meta">Saltato ' + missedDay.name + ' — tocca per recuperarlo</p>' +
       '</div>';
     }
@@ -1715,20 +1731,53 @@
 
     dayEntries.forEach(function (d) {
       var isToday = d.idx === todayIdx;
-      var clickable = d.tpl && !state.activeSession;
+      var isSeries = d.tpls.length > 1;
+      var clickable = d.tpls.length > 0 && !state.activeSession;
+      var clickAction = isSeries
+        ? 'data-action="preview-plan-day" data-weekday="' + d.idx + '"'
+        : (d.tpl ? 'data-action="start-session" data-id="' + d.tpl.id + '"' : '');
       html += '<div class="plan-day' + (isToday ? " today" : "") + (clickable ? " clickable" : "") + '"' +
-        (clickable ? ' data-action="start-session" data-id="' + d.tpl.id + '"' : '') + '>' +
+        (clickable ? ' ' + clickAction : '') + '>' +
         (d.tpl && d.tpl.image_url ? '<img class="plan-day-banner goal" src="' + escapeHtml(d.tpl.image_url) + '" alt="" loading="lazy">' : '') +
         (!d.tpl ? '<img class="plan-day-banner rest" src="Banner/Riposo.jpg" alt="" loading="lazy">' : '') +
         (d.done ? '<span class="plan-day-check">✓</span>' : '') +
         '<button class="plan-day-edit" data-action="edit-plan-day" data-weekday="' + d.idx + '" title="Cambia obiettivo">✏️</button>' +
         '<div class="plan-day-info">' +
-          '<span class="plan-day-name">' + d.name + (isToday ? ' <span class="tag tag-solid" style="font-size:10px;">Oggi</span>' : '') + '</span>' +
-          '<span class="plan-day-workout">' + (d.tpl ? escapeHtml(d.tpl.name) : "Riposo") + '</span>' +
+          '<span class="plan-day-name">' + d.name +
+            (isToday ? ' <span class="tag tag-solid" style="font-size:10px;">Oggi</span>' : '') +
+            (isSeries ? ' <span class="tag" style="font-size:10px;">🔗 ' + d.tpls.length + '</span>' : '') +
+          '</span>' +
+          '<span class="plan-day-workout">' + (d.tpl ? escapeHtml(d.tpl.name) + (isSeries ? ' +' + (d.tpls.length - 1) + ' altri' : '') : "Riposo") + '</span>' +
         '</div>' +
       '</div>';
     });
 
+    return html;
+  }
+
+  function renderPlanDayPreview() {
+    var idx = state.planPreviewWeekday;
+    var assignments = state.weeklyPlan.filter(function (p) { return p.weekday === idx; })
+      .sort(function (a, b) { return (a.order_index || 0) - (b.order_index || 0); });
+    var tpls = assignments.map(function (a) {
+      return state.templates.filter(function (t) { return t.id === a.template_id; })[0];
+    }).filter(Boolean);
+
+    var html = '<button class="back-btn" data-action="plan-cancel-preview">←</button>';
+    html += '<h1 class="page-title">' + WEEKDAY_NAMES[idx] + '</h1>';
+    html += '<p class="page-sub">Serie di ' + tpls.length + ' obiettivi, uno dopo l\'altro</p>';
+
+    html += '<div class="series-list">';
+    tpls.forEach(function (t, i) {
+      html += '<div class="exercise-row">' +
+        '<span class="name">' + (i + 1) + '. ' + escapeHtml(t.name) + '</span>' +
+      '</div>';
+    });
+    html += '</div>';
+
+    if (tpls.length > 0 && !state.activeSession) {
+      html += '<button class="btn btn-cta" data-action="start-series" style="width:100%;margin-top:16px;">Inizia la serie</button>';
+    }
     return html;
   }
 
@@ -1751,26 +1800,41 @@
   function renderPlanEditDay() {
     var idx = state.planEditWeekday;
     var html = '<button class="back-btn" data-action="plan-cancel-edit">←</button>';
-    html += '<h1 class="page-title">' + WEEKDAY_NAMES[idx] + '</h1><p class="page-sub">Assegna un obiettivo a questo giorno, oppure lascialo come giorno di riposo.</p>';
+    html += '<h1 class="page-title">' + WEEKDAY_NAMES[idx] + '</h1><p class="page-sub">Assegna uno o più obiettivi a questo giorno, in ordine. Nessun obiettivo = giorno di riposo.</p>';
 
-    var options = buildGoalOptions();
-    if (options.length === 0) {
-      html += '<div class="empty">Non hai ancora nessun obiettivo da assegnare.<br>Creane uno prima nel tab "Corpo".</div>';
-      return html;
+    var assignments = state.weeklyPlan.filter(function (p) { return p.weekday === idx; })
+      .sort(function (a, b) { return (a.order_index || 0) - (b.order_index || 0); });
+
+    if (assignments.length === 0) {
+      html += '<p class="page-sub" style="margin:0 0 8px;">Giorno di riposo — nessun obiettivo assegnato.</p>';
+    } else {
+      assignments.forEach(function (a, i) {
+        var tpl = state.templates.filter(function (t) { return t.id === a.template_id; })[0];
+        var isFirst = i === 0;
+        var isLast = i === assignments.length - 1;
+        html += '<div class="exercise-row">' +
+          '<div class="exercise-reorder">' +
+            '<button type="button" data-action="move-plan-day-item-up" data-id="' + a.id + '"' + (isFirst ? " disabled" : "") + '>▲</button>' +
+            '<button type="button" data-action="move-plan-day-item-down" data-id="' + a.id + '"' + (isLast ? " disabled" : "") + '>▼</button>' +
+          '</div>' +
+          '<span class="name">' + escapeHtml(tpl ? tpl.name : "?") + '</span>' +
+          '<button type="button" data-action="remove-plan-day-item" data-id="' + a.id + '">&times;</button>' +
+        '</div>';
+      });
     }
 
-    var assignment = state.weeklyPlan.filter(function (p) { return p.weekday === idx; })[0];
-    var currentValue = assignment && assignment.template_id ? "t:" + assignment.template_id : "";
-
-    html += '<form data-action="save-plan-day">' +
-      '<select name="goal">' +
-        '<option value="">Riposo (nessun obiettivo)</option>' +
-        options.map(function (o) {
-          return '<option value="' + o.value + '" ' + (currentValue === o.value ? "selected" : "") + '>' + escapeHtml(o.name) + '</option>';
-        }).join("") +
-      '</select>' +
-      '<button class="btn btn-accent" type="submit">Salva</button>' +
-    '</form>';
+    var options = buildGoalOptions();
+    if (options.length > 0) {
+      html += '<form data-action="add-plan-day-item" style="margin-top:14px;display:flex;gap:8px;">' +
+        '<select name="goal" style="flex:1;">' +
+          '<option value="">Aggiungi un obiettivo...</option>' +
+          options.map(function (o) { return '<option value="' + o.value + '">' + escapeHtml(o.name) + '</option>'; }).join("") +
+        '</select>' +
+        '<button class="btn btn-accent" type="submit">Aggiungi</button>' +
+      '</form>';
+    } else if (assignments.length === 0) {
+      html += '<div class="empty">Non hai ancora nessun obiettivo da assegnare.<br>Creane uno prima nel tab "Corpo".</div>';
+    }
     return html;
   }
 
@@ -2447,6 +2511,21 @@
     return html;
   }
 
+  function renderSeriesRest() {
+    var r = state.seriesRest;
+    if (!r) return "";
+    var html = '<div class="session-summary series-rest">';
+    html += '<img class="series-rest-banner" src="Banner/Riposo.jpg" alt="">';
+    html += '<h1 class="session-summary-title">Obiettivo ' + r.completedIndex + ' di ' + r.total + ' completato! 🎉</h1>';
+    html += '<p class="session-summary-sub">' + escapeHtml(r.completedName) + '</p>';
+    if (r.nextName) {
+      html += '<p class="series-rest-next">Prossimo: <strong>' + escapeHtml(r.nextName) + '</strong></p>';
+      html += '<button class="btn btn-cta" data-action="continue-series" style="margin-top:24px;width:100%;">Continua la serie</button>';
+    }
+    html += '</div>';
+    return html;
+  }
+
   function benessereTabPill(key, label) {
     var active = state.benessereTab === key;
     return '<button class="pill' + (active ? " active" : "") + '" data-action="benessere-tab" data-value="' + key + '">' + label + '</button>';
@@ -2853,19 +2932,83 @@
       }).then(function (tpl) { return tpl.id; });
   }
 
-  function savePlanDay(form) {
+  function addPlanDayItem(form) {
+    withBusy(function () {
+      state.authError = "";
+      var val = form.goal.value;
+      if (!val) return null;
+      var idx = state.planEditWeekday;
+      var existing = state.weeklyPlan.filter(function (p) { return p.weekday === idx; });
+      return resolveGoalSelection(val).then(function (templateId) {
+        if (!templateId) return null;
+        if (existing.some(function (p) { return p.template_id === templateId; })) return null;
+        var nextOrder = existing.length === 0 ? 0 : Math.max.apply(null, existing.map(function (p) { return p.order_index || 0; })) + 1;
+        return sb.from("weekly_plan").insert({ user_id: state.user.id, weekday: idx, template_id: templateId, order_index: nextOrder });
+      }).then(function (res) {
+        if (res && res.error) throw res.error;
+        return loadWeeklyPlan();
+      });
+    });
+  }
+
+  function removePlanDayItem(id) {
+    withBusy(function () {
+      state.authError = "";
+      return sb.from("weekly_plan").delete().eq("id", id).then(function (res) {
+        if (res.error) throw res.error;
+        return loadWeeklyPlan();
+      });
+    });
+  }
+
+  function movePlanDayItem(id, direction) {
     withBusy(function () {
       state.authError = "";
       var idx = state.planEditWeekday;
-      return resolveGoalSelection(form.goal.value).then(function (templateId) {
-        return sb.from("weekly_plan").upsert([{ user_id: state.user.id, weekday: idx, template_id: templateId }], { onConflict: "user_id,weekday" });
-      }).then(function (res) {
-        if (res.error) throw res.error;
+      var list = state.weeklyPlan.filter(function (p) { return p.weekday === idx; })
+        .sort(function (a, b) { return (a.order_index || 0) - (b.order_index || 0); });
+      var i = list.findIndex(function (p) { return p.id === id; });
+      var swapIdx = i + (direction === "up" ? -1 : 1);
+      if (i === -1 || swapIdx < 0 || swapIdx >= list.length) return null;
+      var a = list[i], b = list[swapIdx];
+      return Promise.all([
+        sb.from("weekly_plan").update({ order_index: b.order_index }).eq("id", a.id),
+        sb.from("weekly_plan").update({ order_index: a.order_index }).eq("id", b.id)
+      ]).then(function (results) {
+        if (results[0].error) throw results[0].error;
+        if (results[1].error) throw results[1].error;
         return loadWeeklyPlan();
-      }).then(function () {
-        state.view = "plan";
       });
     });
+  }
+
+  function previewPlanDay(weekday) {
+    state.planPreviewWeekday = weekday;
+    state.view = "planDayPreview";
+    render();
+  }
+
+  function startSeries(templateIds) {
+    if (!templateIds || templateIds.length === 0) return;
+    var season = getCurrentSeason();
+    var seasonRow = seasonStatsRow(season.key);
+    var levelBefore = computeLevel(seasonRow ? seasonRow.sessions_count : 0).level;
+    state.activeSeries = { templateIds: templateIds, position: 0, levelBefore: levelBefore };
+    startSession(templateIds[0]);
+  }
+
+  function startSeriesForWeekday(weekday) {
+    var assignments = state.weeklyPlan.filter(function (p) { return p.weekday === weekday; })
+      .sort(function (a, b) { return (a.order_index || 0) - (b.order_index || 0); });
+    var ids = assignments.map(function (a) { return a.template_id; }).filter(Boolean);
+    startSeries(ids);
+  }
+
+  function continueSeries() {
+    var series = state.activeSeries;
+    state.seriesRest = null;
+    if (!series) { state.view = "plan"; render(); return; }
+    startSession(series.templateIds[series.position]);
   }
 
 
@@ -3026,7 +3169,8 @@
       var templateName = s.template_name;
       var exerciseCount = state.sessionExercises.length;
       var season = getCurrentSeason();
-      var levelBefore = computeLevel(countSessionsInRange(season.start, season.end)).level;
+      var series = state.activeSeries;
+      var levelBefore = series ? series.levelBefore : computeLevel(countSessionsInRange(season.start, season.end)).level;
 
       return sb.from("workout_sessions").update({ finished_at: new Date().toISOString() }).eq("id", s.id).select().single()
         .then(function (res) {
@@ -3036,6 +3180,24 @@
           return Promise.all([loadTemplates(), loadHistory()]).then(function () {
             var seasonRow = seasonStatsRow(season.key);
             var newLevel = computeLevel(seasonRow ? seasonRow.sessions_count : 0);
+
+            if (series && series.position < series.templateIds.length - 1) {
+              var nextIdx = series.position + 1;
+              var nextTpl = state.templates.filter(function (t) { return t.id === series.templateIds[nextIdx]; })[0];
+              state.activeSeries = { templateIds: series.templateIds, position: nextIdx, levelBefore: series.levelBefore };
+              state.seriesRest = {
+                completedIndex: series.position + 1,
+                total: series.templateIds.length,
+                completedName: templateName,
+                nextName: nextTpl ? nextTpl.name : ""
+              };
+              state.view = "seriesRest";
+              beep(660, 200);
+              vibrate([100, 60, 100]);
+              return;
+            }
+
+            state.activeSeries = null;
             state.sessionSummary = {
               templateName: templateName,
               durationText: durationText(startedAt, finishedAt),
@@ -3071,6 +3233,8 @@
         state.activeSession = null;
         state.sessionExercises = [];
         state.circuit = null;
+        state.activeSeries = null;
+        state.seriesRest = null;
         state.view = "home";
       });
     });
@@ -3775,7 +3939,7 @@
     var action = form.getAttribute("data-action");
     if (action === "submit-auth") handleSubmitAuth(form);
     else if (action === "save-library-exercise") saveLibraryExercise(form);
-    else if (action === "save-plan-day") savePlanDay(form);
+    else if (action === "add-plan-day-item") addPlanDayItem(form);
     else if (action === "save-preset-admin") savePresetAdmin(form.name.value.trim(), form.description.value.trim(), form.category.value, form.icon.value.trim());
     else if (action === "save-plan-message") savePlanMessage(form.kind.value, form.text.value.trim(), form.active.checked);
     else if (action === "save-mood") {
@@ -3856,6 +4020,13 @@
     else if (action === "filter-equipment") { state.libraryFilterEquipment = el.getAttribute("data-value") || null; render(); }
     else if (action === "edit-plan-day") editPlanDay(parseInt(el.getAttribute("data-weekday"), 10));
     else if (action === "plan-cancel-edit") { state.view = "plan"; render(); }
+    else if (action === "move-plan-day-item-up") movePlanDayItem(id, "up");
+    else if (action === "move-plan-day-item-down") movePlanDayItem(id, "down");
+    else if (action === "remove-plan-day-item") removePlanDayItem(id);
+    else if (action === "preview-plan-day") previewPlanDay(parseInt(el.getAttribute("data-weekday"), 10));
+    else if (action === "plan-cancel-preview") { state.view = "plan"; render(); }
+    else if (action === "start-series") startSeriesForWeekday(state.planPreviewWeekday);
+    else if (action === "continue-series") continueSeries();
     else if (action === "back-from-profile") backFromProfile();
     else if (action === "cancel-session") cancelSession();
     else if (action === "delete-session") deleteSession(id);

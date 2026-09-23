@@ -398,7 +398,6 @@
   .level-up-tag { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; margin: 0 0 4px; opacity: 0.85; }
   .level-up-num { font-size: 26px; font-weight: 700; margin: 0; }
   .level-up-title { font-size: 16px; font-weight: 700; margin: 2px 0 0; }
-  .series-rest-banner { width: 100%; max-width: 260px; border-radius: var(--radius-lg); margin: 0 auto 12px; display: block; }
   .series-rest-next { color: var(--text-dim); font-size: 14px; margin-top: 4px; }
   @keyframes level-up-pop {
     0% { opacity: 0; transform: scale(0.7); }
@@ -548,6 +547,7 @@
   .circuit-phase-tag.work { background: var(--accent); color: var(--accent-ink); }
   .circuit-phase-tag.rest { background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border); }
   .circuit-exname { font-size: 22px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .circuit-equipment-tip { display: inline-block; font-size: 13px; font-weight: 600; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); padding: 6px 12px; border-radius: 999px; margin: 0 0 10px; }
   .circuit-top-row { display: flex; align-items: center; justify-content: space-between; }
   .circuit-ring-wrap { position: relative; width: 92px; height: 92px; flex-shrink: 0; }
   .circuit-ring { width: 92px; height: 92px; transform: rotate(-90deg); }
@@ -1100,6 +1100,15 @@
     "Cavi": "🔗",
     "Elastico": "➰",
     "Sbarra": "🧗"
+  };
+  var EQUIPMENT_PREP_PHRASE = {
+    "Manubri": "Prepara i manubri",
+    "Bilanciere": "Prepara il bilanciere",
+    "Kettlebell": "Prepara il kettlebell",
+    "Macchina": "Preparati alla macchina",
+    "Cavi": "Prepara i cavi",
+    "Elastico": "Prepara l'elastico",
+    "Sbarra": "Prepara la sbarra"
   };
 
   var state = {
@@ -1802,7 +1811,7 @@
     var html = '<button class="back-btn" data-action="plan-cancel-edit">←</button>';
     html += '<h1 class="page-title">' + WEEKDAY_NAMES[idx] + '</h1><p class="page-sub">Assegna uno o più obiettivi a questo giorno, in ordine. Nessun obiettivo = giorno di riposo.</p>';
 
-    var assignments = state.weeklyPlan.filter(function (p) { return p.weekday === idx; })
+    var assignments = state.weeklyPlan.filter(function (p) { return p.weekday === idx && p.template_id; })
       .sort(function (a, b) { return (a.order_index || 0) - (b.order_index || 0); });
 
     if (assignments.length === 0) {
@@ -1825,8 +1834,8 @@
 
     var options = buildGoalOptions();
     if (options.length > 0) {
-      html += '<form data-action="add-plan-day-item" style="margin-top:14px;display:flex;gap:8px;">' +
-        '<select name="goal" style="flex:1;">' +
+      html += '<form data-action="add-plan-day-item" style="margin-top:14px;">' +
+        '<select name="goal">' +
           '<option value="">Aggiungi un obiettivo...</option>' +
           options.map(function (o) { return '<option value="' + o.value + '">' + escapeHtml(o.name) + '</option>'; }).join("") +
         '</select>' +
@@ -2324,6 +2333,19 @@
     return match && isVideoUrl(match.image_url) ? match.image_url : null;
   }
 
+  function findExerciseEquipment(ex) {
+    if (!ex) return null;
+    var match = null;
+    if (ex.library_exercise_id) {
+      match = state.libraryExercises.filter(function (le) { return le.id === ex.library_exercise_id; })[0];
+    }
+    if (!match) {
+      var name = (ex.name || "").trim().toLowerCase();
+      match = state.libraryExercises.filter(function (le) { return le.name.trim().toLowerCase() === name; })[0];
+    }
+    return match && match.equipment && match.equipment !== "Corpo libero" ? match.equipment : null;
+  }
+
   function renderCircuitPlayer() {
     var c = state.circuit;
     var exs = state.sessionExercises;
@@ -2333,6 +2355,7 @@
     var totalForPhase = isRest ? restSecondsFor(state.activeSession) : current.duration_seconds;
     var pct = Math.max(0, Math.min(100, Math.round((c.secondsLeft / totalForPhase) * 100)));
     var videoUrl = !isRest ? findExerciseMedia(current) : null;
+    var nextEquipment = isRest ? findExerciseEquipment(nextEx) : null;
     var circumference = 2 * Math.PI * 28;
     var ringOffset = circumference * (1 - pct / 100);
 
@@ -2349,6 +2372,10 @@
     html += '<p class="circuit-progress">Esercizio ' + (c.index + 1) + ' di ' + exs.length + '</p>';
     html += '<div class="circuit-phase-tag ' + (isRest ? "rest" : "work") + '">' + (isRest ? "RIPOSO" : "IN CORSO") + '</div>';
     html += '<h2 class="circuit-exname">' + escapeHtml(isRest ? (nextEx ? "Prossimo: " + nextEx.name : "Ultimo esercizio") : current.name) + '</h2>';
+
+    if (isRest && nextEquipment && EQUIPMENT_PREP_PHRASE[nextEquipment]) {
+      html += '<p class="circuit-equipment-tip">' + equipmentIcon(nextEquipment) + ' ' + escapeHtml(EQUIPMENT_PREP_PHRASE[nextEquipment]) + '</p>';
+    }
 
     if (videoUrl) {
       html += '<div class="exlib-detail-video-wrap"><video class="exlib-detail-video" src="' + escapeHtml(videoUrl) + '" autoplay muted loop playsinline preload="auto"></video></div>';
@@ -2515,7 +2542,7 @@
     var r = state.seriesRest;
     if (!r) return "";
     var html = '<div class="session-summary series-rest">';
-    html += '<img class="series-rest-banner" src="Banner/Riposo.jpg" alt="">';
+    html += '<div class="exlib-detail-video-wrap"><video class="exlib-detail-video" src="Esercizi/Stretching petto e spalle.mp4" autoplay muted loop playsinline preload="auto"></video></div>';
     html += '<h1 class="session-summary-title">Obiettivo ' + r.completedIndex + ' di ' + r.total + ' completato! 🎉</h1>';
     html += '<p class="session-summary-sub">' + escapeHtml(r.completedName) + '</p>';
     if (r.nextName) {

@@ -102,6 +102,26 @@
   .btn-small { width: auto; padding: 10px 16px; font-size: 13px; }
   .btn-row { display: flex; gap: 8px; margin-top: 10px; }
   .btn-row .btn { width: auto; flex: 1; }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 1000;
+  }
+  .modal-card {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 22px;
+    max-width: 340px;
+    width: 100%;
+  }
+  .modal-card h3 { margin: 0 0 8px; font-size: 17px; }
+  .modal-card p { margin: 0 0 18px; font-size: 14px; color: var(--text-dim); line-height: 1.4; }
   .btn[disabled] { opacity: 0.5; cursor: default; }
 
   input, textarea {
@@ -1217,6 +1237,7 @@
     profileReturnTab: null,
     flashMessage: null,
     history: [],
+    confirmDeleteAllHistory: false,
     historyDetail: null,
     historyDetailExercises: [],
     presets: [],
@@ -1511,7 +1532,8 @@
         (state.authError ? '<div class="error-msg">' + escapeHtml(state.authError) + '</div>' : "") +
         body +
       '</main>' +
-      (showNav ? renderBottomNav() : "");
+      (showNav ? renderBottomNav() : "") +
+      renderConfirmDeleteAllHistoryModal();
 
     Array.prototype.forEach.call(app.querySelectorAll(".pill-row"), function (el, i) {
       if (pillScrollPositions[i] != null) el.scrollLeft = pillScrollPositions[i];
@@ -2576,8 +2598,23 @@
           '</div>' +
         '</div>';
       });
+      html += '<button class="btn btn-danger btn-small" data-action="open-delete-all-history" style="margin-top:10px;">Elimina tutta la cronologia</button>';
     }
     return html;
+  }
+
+  function renderConfirmDeleteAllHistoryModal() {
+    if (!state.confirmDeleteAllHistory) return "";
+    return '<div class="modal-overlay">' +
+      '<div class="modal-card">' +
+        '<h3>Eliminare tutta la cronologia?</h3>' +
+        '<p>Tutti i ' + state.history.length + ' allenamenti registrati verranno eliminati per sempre. L\'operazione non è reversibile.</p>' +
+        '<div class="btn-row">' +
+          '<button class="btn btn-ghost" data-action="cancel-delete-all-history">Annulla</button>' +
+          '<button class="btn btn-danger" data-action="confirm-delete-all-history">Elimina tutto</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
   }
 
   function renderHistoryDetail() {
@@ -3435,6 +3472,19 @@
     });
   }
 
+  function deleteAllHistory() {
+    withBusy(function () {
+      state.authError = "";
+      return sb.from("workout_sessions").delete().eq("user_id", state.user.id).then(function (res) {
+        if (res.error) throw res.error;
+        state.confirmDeleteAllHistory = false;
+        return loadHistory();
+      }).then(function () {
+        state.view = "history";
+      });
+    });
+  }
+
   function openProfile() {
     var fromTab = state.view;
     withBusy(function () {
@@ -4200,6 +4250,9 @@
     else if (action === "back-from-profile") backFromProfile();
     else if (action === "cancel-session") cancelSession();
     else if (action === "delete-session") deleteSession(id);
+    else if (action === "open-delete-all-history") { state.confirmDeleteAllHistory = true; render(); }
+    else if (action === "cancel-delete-all-history") { state.confirmDeleteAllHistory = false; render(); }
+    else if (action === "confirm-delete-all-history") deleteAllHistory();
     else if (action === "personalize-workout") personalizeWorkout();
     else if (action === "toggle-favorite") toggleFavorite(id);
     else if (action === "set-workout-view-mode") { state.workoutViewMode = el.getAttribute("data-value"); render(); }

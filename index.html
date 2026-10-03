@@ -410,6 +410,27 @@
   .level-up-num { font-size: 26px; font-weight: 700; margin: 0; }
   .level-up-title { font-size: 16px; font-weight: 700; margin: 2px 0 0; }
   .series-rest-next { color: var(--text-dim); font-size: 14px; margin-top: 4px; }
+
+  .xp-recap-card {
+    margin-top: 14px;
+    padding: 16px;
+    border-radius: var(--radius-lg);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    text-align: left;
+    animation: level-up-pop 0.5s cubic-bezier(.2,1.6,.4,1) 0.1s backwards;
+  }
+  .xp-recap-title { font-weight: 700; font-size: 15px; margin: 0 0 10px; }
+  .xp-recap-rows { display: flex; flex-direction: column; gap: 4px; }
+  .xp-recap-row { display: flex; justify-content: space-between; font-size: 14px; color: var(--text-dim); }
+  .xp-recap-row.xp-recap-bonus { color: var(--accent); font-weight: 600; }
+  .xp-recap-row.xp-recap-malus { color: var(--text-dim); font-weight: 600; }
+  .xp-recap-row.xp-recap-total { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 6px; font-weight: 700; color: var(--text); font-size: 16px; }
+  .xp-recap-level { margin-top: 12px; font-size: 14px; }
+  .xp-recap-level p { margin: 0; }
+  .xp-progress-bar { margin-top: 8px; height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; }
+  .xp-progress-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--cta)); }
+  .xp-recap-motivation { margin: 12px 0 0; font-style: italic; font-size: 13px; color: var(--text-dim); text-align: center; }
   @keyframes level-up-pop {
     0% { opacity: 0; transform: scale(0.7); }
     60% { opacity: 1; transform: scale(1.06); }
@@ -924,6 +945,25 @@
       if (DIFFICULTIES[i].key === key) return DIFFICULTIES[i];
     }
     return DIFFICULTIES[1];
+  }
+
+  var BASE_XP_PER_SESSION = 100;
+
+  var MOTIVATIONAL_PHRASES = [
+    "Ogni serie è un passo verso il panda leggendario che sarai.",
+    "Il dojo ricorderà questo allenamento.",
+    "Un altro mattone sul muro della tua forza.",
+    "I muscoli crescono, la leggenda pure.",
+    "Non hai solo finito un allenamento: hai scritto la tua storia.",
+    "Il panda pigro trema davanti a te.",
+    "Punti esperienza guadagnati, debolezza persa.",
+    "Oggi hai scelto di essere più forte di ieri.",
+    "Il prossimo livello ti aspetta, ma se lo merita chi non si ferma.",
+    "Sudore oggi, leggenda domani."
+  ];
+
+  function pickMotivationalPhrase() {
+    return MOTIVATIONAL_PHRASES[Math.floor(Math.random() * MOTIVATIONAL_PHRASES.length)];
   }
 
   function buildDifficultyExercises(baseList, diffKey) {
@@ -2589,6 +2629,32 @@
       html += '<div class="card session-summary-streak">🔥 ' + sum.streak + ' giorni di fila!</div>';
     }
 
+    if (sum.xpBase != null) {
+      html += '<div class="xp-recap-card">';
+      html += '<p class="xp-recap-title">⚔️ Esperienza guadagnata</p>';
+      html += '<div class="xp-recap-rows">';
+      html += '<div class="xp-recap-row"><span>XP base</span><span>' + sum.xpBase + '</span></div>';
+      if (sum.xpDelta > 0) {
+        html += '<div class="xp-recap-row xp-recap-bonus"><span>Bonus ' + escapeHtml(sum.difficultyEmoji) + ' ' + escapeHtml(sum.difficultyLabel) + '</span><span>+' + sum.xpDelta + '</span></div>';
+      } else if (sum.xpDelta < 0) {
+        html += '<div class="xp-recap-row xp-recap-malus"><span>Riduzione ' + escapeHtml(sum.difficultyEmoji) + ' ' + escapeHtml(sum.difficultyLabel) + '</span><span>' + sum.xpDelta + '</span></div>';
+      }
+      html += '<div class="xp-recap-row xp-recap-total"><span>Totale</span><span>' + sum.xpTotal + ' XP</span></div>';
+      html += '</div>';
+
+      html += '<div class="xp-recap-level">';
+      if (sum.isMaxLevel) {
+        html += '<p>Sei già <strong>' + escapeHtml(sum.currentTitle) + '</strong>, il livello massimo! 🏆</p>';
+      } else {
+        html += '<p>Sei <strong>' + escapeHtml(sum.currentTitle) + '</strong> — mancano <strong>' + sum.pointsToNext + ' XP</strong> per diventare <strong>' + escapeHtml(sum.nextTitle) + '</strong>.</p>';
+        html += '<div class="xp-progress-bar"><div class="xp-progress-fill" style="width:' + sum.progressPct + '%;"></div></div>';
+      }
+      html += '</div>';
+
+      html += '<p class="xp-recap-motivation">' + escapeHtml(sum.motivation) + '</p>';
+      html += '</div>';
+    }
+
     html += '<button class="btn btn-cta" data-action="dismiss-session-summary" style="margin-top:24px;width:100%;">Fantastico! Continua</button>';
     html += '</div>';
     return html;
@@ -3251,6 +3317,8 @@
       var startedAt = s.started_at;
       var templateName = s.template_name;
       var exerciseCount = state.sessionExercises.length;
+      var xpWeight = s.xp_weight != null ? s.xp_weight : 1;
+      var diffInfo = DIFFICULTIES.filter(function (d) { return d.xpWeight === xpWeight; })[0] || getDifficulty(state.selectedDifficulty);
       var season = getCurrentSeason();
       var series = state.activeSeries;
       var levelBefore = series ? series.levelBefore : computeLevel(countSessionsInRange(season.start, season.end)).level;
@@ -3281,6 +3349,8 @@
             }
 
             state.activeSeries = null;
+            var xpTotal = Math.round(BASE_XP_PER_SESSION * xpWeight);
+            var xpDelta = xpTotal - BASE_XP_PER_SESSION;
             state.sessionSummary = {
               templateName: templateName,
               durationText: durationText(startedAt, finishedAt),
@@ -3288,7 +3358,18 @@
               streak: computeStreak(),
               leveledUp: newLevel.level > levelBefore,
               newLevel: newLevel.level,
-              newTitle: newLevel.title
+              newTitle: newLevel.title,
+              difficultyLabel: diffInfo.label,
+              difficultyEmoji: diffInfo.emoji,
+              xpBase: BASE_XP_PER_SESSION,
+              xpDelta: xpDelta,
+              xpTotal: xpTotal,
+              currentTitle: newLevel.title,
+              nextTitle: newLevel.nextTitle,
+              pointsToNext: Math.round(newLevel.sessionsToNext * BASE_XP_PER_SESSION),
+              isMaxLevel: newLevel.isMaxLevel,
+              progressPct: newLevel.progressPct,
+              motivation: pickMotivationalPhrase()
             };
             state.view = "sessionSummary";
             playFanfare();

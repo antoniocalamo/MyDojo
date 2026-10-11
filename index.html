@@ -122,6 +122,24 @@
   }
   .modal-card h3 { margin: 0 0 8px; font-size: 17px; }
   .modal-card p { margin: 0 0 18px; font-size: 14px; color: var(--text-dim); line-height: 1.4; }
+
+  .range-option-list { display: flex; flex-direction: column; gap: 8px; margin: 0 0 14px; }
+  .range-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .range-option.selected { border-color: var(--accent); }
+  .range-option .check { width: 18px; height: 18px; border-radius: 999px; border: 2px solid var(--border); flex-shrink: 0; }
+  .range-option.selected .check { border-color: var(--accent); background: var(--accent); }
   .btn[disabled] { opacity: 0.5; cursor: default; }
 
   input, textarea {
@@ -1237,7 +1255,7 @@
     profileReturnTab: null,
     flashMessage: null,
     history: [],
-    confirmDeleteAllHistory: false,
+    deleteHistoryRange: null,
     historyDetail: null,
     historyDetailExercises: [],
     presets: [],
@@ -2598,23 +2616,50 @@
           '</div>' +
         '</div>';
       });
-      html += '<button class="btn btn-danger btn-small" data-action="open-delete-all-history" style="margin-top:10px;">Elimina tutta la cronologia</button>';
+      html += '<button class="btn btn-danger btn-small" data-action="open-delete-all-history" style="margin-top:10px;">Elimina cronologia</button>';
     }
     return html;
   }
 
+  var HISTORY_DELETE_RANGES = [
+    { key: "day", label: "Ultimo giorno", days: 1 },
+    { key: "week", label: "Ultima settimana", days: 7 },
+    { key: "month", label: "Ultimo mese", days: 30 },
+    { key: "3months", label: "Ultimi 3 mesi", days: 90 },
+    { key: "year", label: "Ultimo anno", days: 365 },
+    { key: "all", label: "Tutta la cronologia", days: null }
+  ];
+
+  function sessionsInDeleteRange(key) {
+    if (key === "all") return state.history.slice();
+    var range = HISTORY_DELETE_RANGES.filter(function (r) { return r.key === key; })[0];
+    if (!range) return [];
+    var cutoff = new Date(Date.now() - range.days * 24 * 3600 * 1000);
+    return state.history.filter(function (s) { return new Date(s.started_at) >= cutoff; });
+  }
+
   function renderConfirmDeleteAllHistoryModal() {
-    if (!state.confirmDeleteAllHistory) return "";
-    return '<div class="modal-overlay">' +
-      '<div class="modal-card">' +
-        '<h3>Eliminare tutta la cronologia?</h3>' +
-        '<p>Tutti i ' + state.history.length + ' allenamenti registrati verranno eliminati per sempre. L\'operazione non è reversibile.</p>' +
-        '<div class="btn-row">' +
-          '<button class="btn btn-ghost" data-action="cancel-delete-all-history">Annulla</button>' +
-          '<button class="btn btn-danger" data-action="confirm-delete-all-history">Elimina tutto</button>' +
-        '</div>' +
-      '</div>' +
+    if (!state.deleteHistoryRange) return "";
+    var selected = state.deleteHistoryRange;
+    var matching = sessionsInDeleteRange(selected);
+    var html = '<div class="modal-overlay"><div class="modal-card">';
+    html += '<h3>Elimina cronologia</h3>';
+    html += '<p>Scegli quale periodo eliminare. L\'operazione non è reversibile.</p>';
+    html += '<div class="range-option-list">';
+    HISTORY_DELETE_RANGES.forEach(function (r) {
+      html += '<div class="range-option' + (selected === r.key ? ' selected' : '') + '" data-action="select-delete-range" data-id="' + r.key + '">' +
+        '<span>' + r.label + '</span><span class="check"></span>' +
+      '</div>';
+    });
+    html += '</div>';
+    html += '<p style="font-size:13px;margin-top:-4px;">' + matching.length + ' allenament' + (matching.length === 1 ? "o" : "i") +
+      ' verr' + (matching.length === 1 ? "à" : "anno") + ' eliminat' + (matching.length === 1 ? "o" : "i") + '.</p>';
+    html += '<div class="btn-row">' +
+      '<button class="btn btn-ghost" data-action="cancel-delete-all-history">Annulla</button>' +
+      '<button class="btn btn-danger" data-action="confirm-delete-all-history"' + (matching.length === 0 ? " disabled" : "") + '>Elimina</button>' +
     '</div>';
+    html += '</div></div>';
+    return html;
   }
 
   function renderHistoryDetail() {
@@ -3473,11 +3518,19 @@
   }
 
   function deleteAllHistory() {
+    var range = state.deleteHistoryRange;
+    if (!range) return;
     withBusy(function () {
       state.authError = "";
-      return sb.from("workout_sessions").delete().eq("user_id", state.user.id).then(function (res) {
+      var query = sb.from("workout_sessions").delete().eq("user_id", state.user.id);
+      if (range !== "all") {
+        var rangeInfo = HISTORY_DELETE_RANGES.filter(function (r) { return r.key === range; })[0];
+        var cutoff = new Date(Date.now() - rangeInfo.days * 24 * 3600 * 1000);
+        query = query.gte("started_at", cutoff.toISOString());
+      }
+      return query.then(function (res) {
         if (res.error) throw res.error;
-        state.confirmDeleteAllHistory = false;
+        state.deleteHistoryRange = null;
         return loadHistory();
       }).then(function () {
         state.view = "history";
@@ -4250,8 +4303,9 @@
     else if (action === "back-from-profile") backFromProfile();
     else if (action === "cancel-session") cancelSession();
     else if (action === "delete-session") deleteSession(id);
-    else if (action === "open-delete-all-history") { state.confirmDeleteAllHistory = true; render(); }
-    else if (action === "cancel-delete-all-history") { state.confirmDeleteAllHistory = false; render(); }
+    else if (action === "open-delete-all-history") { state.deleteHistoryRange = "day"; render(); }
+    else if (action === "cancel-delete-all-history") { state.deleteHistoryRange = null; render(); }
+    else if (action === "select-delete-range") { state.deleteHistoryRange = id; render(); }
     else if (action === "confirm-delete-all-history") deleteAllHistory();
     else if (action === "personalize-workout") personalizeWorkout();
     else if (action === "toggle-favorite") toggleFavorite(id);

@@ -59,6 +59,7 @@
     padding-bottom: 90px;
   }
   main.screen { padding: 20px 18px 24px; }
+  .exlib-sticky-header { position: sticky; top: 0; z-index: 5; background: var(--bg); margin: -20px -18px 0; padding: 20px 18px 0; }
   h1.page-title {
     font-size: 28px;
     font-weight: 700;
@@ -2308,6 +2309,8 @@
       pillButton("Tutti gli attrezzi", "filter-equipment", "", !state.libraryFilterEquipment) +
       EQUIPMENT_TYPES.map(function (eq) { return pillButton(eq, "filter-equipment", eq, state.libraryFilterEquipment === eq); }).join("") +
     '</div>';
+
+    html = '<div class="exlib-sticky-header">' + html + '</div>';
 
     var list = state.libraryExercises.filter(function (ex) {
       if (state.libraryFilterMuscle) {

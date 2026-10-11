@@ -1312,21 +1312,34 @@
   var meditationTimerHandle = null;
   var audioCtx = null;
 
-  function beep(freq, durMs) {
+  function beep(freq, durMs, opts) {
     try {
       var Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
       if (!audioCtx) audioCtx = new Ctx();
       if (audioCtx.state === "suspended") audioCtx.resume();
+      var now = audioCtx.currentTime;
+      var dur = durMs / 1000;
+      var peak = (opts && opts.gain != null) ? opts.gain : 0.12;
       var osc = audioCtx.createOscillator();
       var gain = audioCtx.createGain();
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+      osc.type = (opts && opts.type) || "sine";
+      osc.frequency.setValueAtTime(freq, now);
+      if (opts && opts.glideTo) osc.frequency.exponentialRampToValueAtTime(opts.glideTo, now + dur);
+      var attack = Math.min(0.02, dur / 4);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(peak, now + attack);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + durMs / 1000);
+      osc.start(now);
+      osc.stop(now + dur + 0.02);
     } catch (e) {}
+  }
+
+  function cuteChime() {
+    beep(880, 90, { type: "sine", gain: 0.1 });
+    setTimeout(function () { beep(1175, 150, { type: "sine", gain: 0.1 }); }, 85);
   }
 
   function vibrate(pattern) {
@@ -1438,7 +1451,7 @@
     if (state.circuit.secondsLeft <= 0) {
       advanceCircuitPhase();
     } else {
-      if (state.circuit.secondsLeft <= 3) beep(660, 90);
+      if (state.circuit.secondsLeft <= 3) beep(800 - state.circuit.secondsLeft * 60, 70, { type: "triangle", gain: 0.08 });
       updateCircuitDom();
     }
   }
@@ -1458,7 +1471,7 @@
       c.phase = "work";
       c.secondsLeft = exs[c.index].duration_seconds;
     }
-    beep(880, 180);
+    cuteChime();
     vibrate(150);
     render();
   }

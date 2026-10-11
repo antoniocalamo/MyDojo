@@ -222,6 +222,16 @@
   .difficulty-btn.active { background: var(--accent); border-color: var(--accent); }
   .difficulty-btn.active .difficulty-label { color: var(--accent-ink); }
 
+  .difficulty-count-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .difficulty-count-tile {
+    display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 6px;
+  }
+  .difficulty-count-num { font-size: 20px; font-weight: 700; }
+  .difficulty-count-lbl { font-size: 12px; font-weight: 600; color: var(--text-dim); line-height: 1.2; }
+  .difficulty-count-sub { font-size: 11px; color: var(--text-dim); opacity: 0.8; }
+
   .greeting-card {
     display: flex;
     align-items: center;
@@ -1744,6 +1754,17 @@
     return streak;
   }
 
+  function computeDifficultyCounts() {
+    var counts = {};
+    DIFFICULTIES.forEach(function (d) { counts[d.key] = { sessions: 0, exercises: 0 }; });
+    state.history.forEach(function (s) {
+      if (!s.finished_at || !s.difficulty_key || !counts[s.difficulty_key]) return;
+      counts[s.difficulty_key].sessions += 1;
+      counts[s.difficulty_key].exercises += (s.exercise_count || 0);
+    });
+    return counts;
+  }
+
   function dayOfYear(d) {
     var start = new Date(d.getFullYear(), 0, 0);
     return Math.floor((d - start) / 86400000);
@@ -2582,6 +2603,23 @@
       '<div class="stat-tile"><span class="num">' + state.stats.hours + '</span><span class="lbl">Ore totali</span></div>' +
     '</div>';
 
+    var diffCounts = computeDifficultyCounts();
+    var diffCountsTotal = DIFFICULTIES.reduce(function (sum, d) { return sum + diffCounts[d.key].exercises; }, 0);
+    if (diffCountsTotal > 0) {
+      html += '<h3 class="section-title">Esercizi per difficoltà</h3>';
+      html += '<div class="difficulty-count-grid">';
+      DIFFICULTIES.forEach(function (d) {
+        var c = diffCounts[d.key];
+        html += '<div class="difficulty-count-tile">' +
+          '<span class="difficulty-emoji">' + d.emoji + '</span>' +
+          '<span class="difficulty-count-num">' + c.exercises + '</span>' +
+          '<span class="difficulty-count-lbl">' + escapeHtml(d.label) + '</span>' +
+          '<span class="difficulty-count-sub">' + c.sessions + ' allenament' + (c.sessions === 1 ? "o" : "i") + '</span>' +
+        '</div>';
+      });
+      html += '</div>';
+    }
+
     var pastSeasons = getPastSeasons();
     if (pastSeasons.length > 0) {
       html += '<h3 class="section-title" style="margin-top:0;">Stagioni passate</h3>';
@@ -3400,7 +3438,7 @@
       var templateName = s.template_name;
       var exerciseCount = state.sessionExercises.length;
       var xpWeight = s.xp_weight != null ? s.xp_weight : 1;
-      var diffInfo = DIFFICULTIES.filter(function (d) { return d.xpWeight === xpWeight; })[0] || getDifficulty(state.selectedDifficulty);
+      var diffInfo = s.difficulty_key ? getDifficulty(s.difficulty_key) : (DIFFICULTIES.filter(function (d) { return d.xpWeight === xpWeight; })[0] || getDifficulty(state.selectedDifficulty));
       var season = getCurrentSeason();
       var series = state.activeSeries;
       var levelBefore = series ? series.levelBefore : computeLevel(countSessionsInRange(season.start, season.end)).level;
@@ -3968,13 +4006,15 @@
     }).concat(exercises);
   }
 
-  function beginSession(templateId, templateName, exercisesForSession, restSeconds, xpWeight) {
+  function beginSession(templateId, templateName, exercisesForSession, restSeconds, xpWeight, difficultyKey) {
     return sb.from("workout_sessions").insert({
       user_id: state.user.id,
       template_id: templateId,
       template_name: templateName,
       rest_seconds: restSeconds != null ? restSeconds : REST_SECONDS,
-      xp_weight: xpWeight != null ? xpWeight : 1
+      xp_weight: xpWeight != null ? xpWeight : 1,
+      difficulty_key: difficultyKey || null,
+      exercise_count: exercisesForSession ? exercisesForSession.length : 0
     }).select().single().then(function (res) {
       if (res.error) throw res.error;
       state.activeSession = res.data;
@@ -4016,18 +4056,18 @@
       var diff = getDifficulty(state.selectedDifficulty);
       if (w.kind === "template") {
         var adjusted = buildDifficultyExercises(state.currentWorkoutExercises, diff.key);
-        return beginSession(w.data.id, w.data.name, adjusted, restSecondsFor(w.data), diff.xpWeight);
+        return beginSession(w.data.id, w.data.name, adjusted, restSecondsFor(w.data), diff.xpWeight, diff.key);
       }
       if (w.linkedPersonal) {
         var usePersonal = state.workoutViewMode === "personal";
         var exs = usePersonal ? state.currentWorkoutPersonalExercises : state.currentWorkoutExercises;
         var srcData = usePersonal ? w.linkedPersonal : w.data;
         var adjusted2 = buildDifficultyExercises(exs, diff.key);
-        return beginSession(w.linkedPersonal.id, srcData.name, adjusted2, restSecondsFor(srcData), diff.xpWeight);
+        return beginSession(w.linkedPersonal.id, srcData.name, adjusted2, restSecondsFor(srcData), diff.xpWeight, diff.key);
       }
       return clonePresetToPersonal(w.data, state.currentWorkoutExercises, state.currentCategory).then(function (tpl) {
         var adjusted3 = buildDifficultyExercises(tpl.exercises, diff.key);
-        return beginSession(tpl.id, tpl.name, adjusted3, restSecondsFor(tpl), diff.xpWeight);
+        return beginSession(tpl.id, tpl.name, adjusted3, restSecondsFor(tpl), diff.xpWeight, diff.key);
       });
     });
   }

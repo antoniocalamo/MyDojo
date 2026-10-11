@@ -636,6 +636,13 @@
   .circuit-ring-fill { fill: none; stroke: var(--accent); stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
   .circuit-ring-fill.rest { stroke: var(--text-dim); }
   .circuit-ring-number { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .circuit-rest-mascot { display: flex; justify-content: center; margin: 10px 0 4px; animation: circuit-rest-bounce 1.8s ease-in-out infinite; }
+  .circuit-rest-mascot .mascot-badge { width: 84px; height: 84px; }
+  .circuit-rest-phrase { text-align: center; font-size: 14px; font-weight: 600; color: var(--text-dim); margin: 0 0 10px; }
+  @keyframes circuit-rest-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-7px); }
+  }
 
   /* libreria esercizi */
   select {
@@ -1013,6 +1020,23 @@
 
   function pickMotivationalPhrase() {
     return MOTIVATIONAL_PHRASES[Math.floor(Math.random() * MOTIVATIONAL_PHRASES.length)];
+  }
+
+  var REST_PHRASES = [
+    "Respira un po' 🌬️",
+    "Il panda si ricarica 🐼🔋",
+    "Scrolla le spalle, rilassa il collo",
+    "Bevi un sorso d'acqua, se ti va 💧",
+    "Scuoti le gambe, sciogli i muscoli",
+    "Bel lavoro finora, continua così 👏",
+    "Un attimo di pausa, te la sei meritata",
+    "Il panda fa un pisolino lampo 😴",
+    "Ricarica le batterie per il prossimo round ⚡",
+    "Quasi pronti per ripartire!"
+  ];
+
+  function pickRestPhrase() {
+    return REST_PHRASES[Math.floor(Math.random() * REST_PHRASES.length)];
   }
 
   function buildDifficultyExercises(baseList, diffKey) {
@@ -1466,6 +1490,7 @@
       }
       c.phase = "rest";
       c.secondsLeft = restSecondsFor(state.activeSession);
+      c.restPhrase = pickRestPhrase();
     } else {
       c.index += 1;
       c.phase = "work";
@@ -2543,8 +2568,13 @@
       '</div>' +
     '</div>';
     html += '<p class="circuit-progress">Esercizio ' + (c.index + 1) + ' di ' + exs.length + '</p>';
-    html += '<div class="circuit-phase-tag ' + (isRest ? "rest" : "work") + '">' + (isRest ? "RIPOSO" : "IN CORSO") + '</div>';
+    html += '<div class="circuit-phase-tag ' + (isRest ? "rest" : "work") + '">' + (isRest ? "😌 RIPOSO" : "IN CORSO") + '</div>';
     html += '<h2 class="circuit-exname">' + escapeHtml(isRest ? (nextEx ? "Prossimo: " + nextEx.name : "Ultimo esercizio") : current.name) + '</h2>';
+
+    if (isRest) {
+      html += '<div class="circuit-rest-mascot">' + mascotBadge(MASCOT_FULL, 90) + '</div>';
+      html += '<p class="circuit-rest-phrase">' + escapeHtml(c.restPhrase || pickRestPhrase()) + '</p>';
+    }
 
     if (isRest && nextEquipment && EQUIPMENT_PREP_PHRASE[nextEquipment]) {
       html += '<p class="circuit-equipment-tip">' + equipmentIcon(nextEquipment) + ' ' + escapeHtml(EQUIPMENT_PREP_PHRASE[nextEquipment]) + '</p>';

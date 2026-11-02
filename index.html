@@ -1039,6 +1039,16 @@
     return REST_PHRASES[Math.floor(Math.random() * REST_PHRASES.length)];
   }
 
+  var CARDIO_DURATIONS = [10, 20, 30, 45, 60];
+  var CARDIO_MET = { facile: 3.5, normale: 6, difficile: 8.5, impossibile: 11 };
+  var DEFAULT_WEIGHT_KG = 70;
+
+  function estimateCalories(diffKey, minutes, weightKg) {
+    var met = CARDIO_MET[diffKey] || CARDIO_MET.normale;
+    var w = weightKg != null ? weightKg : DEFAULT_WEIGHT_KG;
+    return Math.round(met * w * (minutes / 60));
+  }
+
   function buildDifficultyExercises(baseList, diffKey) {
     var diff = getDifficulty(diffKey);
     if (!baseList || baseList.length === 0) return [];
@@ -1320,7 +1330,10 @@
     meditation: null,
     moodEntries: [],
     moodDraft: { mood: null, note: "" },
-    dojoToken: null
+    dojoToken: null,
+    userSettings: { weight_kg: null },
+    cardioSetup: { durationMinutes: 20 },
+    cardio: null
   };
 
   try {
@@ -1332,6 +1345,7 @@
   var app = document.getElementById("app");
   var workoutTimerHandle = null;
   var circuitTimerHandle = null;
+  var cardioTimerHandle = null;
   var breathingTimerHandle = null;
   var meditationTimerHandle = null;
   var audioCtx = null;
@@ -1520,6 +1534,65 @@
     finishSession();
   }
 
+  function stopCardioTimer() {
+    if (cardioTimerHandle) { clearInterval(cardioTimerHandle); cardioTimerHandle = null; }
+  }
+
+  function startCardioTimer() {
+    stopCardioTimer();
+    cardioTimerHandle = setInterval(tickCardio, 1000);
+  }
+
+  function updateCardioDom() {
+    var c = state.cardio;
+    var timeEl = document.getElementById("cardio-time");
+    var ringEl = document.getElementById("cardio-ring-fill");
+    var minEl = document.getElementById("cardio-minutes");
+    var calEl = document.getElementById("cardio-calories");
+    if (!c || !timeEl) return;
+    var mm = Math.floor(c.secondsLeft / 60);
+    var ss = c.secondsLeft % 60;
+    timeEl.textContent = mm + ":" + (ss < 10 ? "0" : "") + ss;
+    if (ringEl) {
+      var pct = Math.max(0, Math.min(100, Math.round((c.secondsLeft / c.totalSeconds) * 100)));
+      var circumference = 2 * Math.PI * 28;
+      ringEl.style.strokeDashoffset = (circumference * (1 - pct / 100)).toFixed(2);
+    }
+    var diff = getDifficulty(state.activeSession.difficulty_key || state.selectedDifficulty);
+    var elapsedMinutes = (c.totalSeconds - c.secondsLeft) / 60;
+    var weight = state.userSettings.weight_kg;
+    if (minEl) minEl.textContent = Math.round(elapsedMinutes);
+    if (calEl) calEl.textContent = "~" + estimateCalories(diff.key, elapsedMinutes, weight);
+  }
+
+  function tickCardio() {
+    if (!state.cardio || state.cardio.paused) return;
+    state.cardio.secondsLeft -= 1;
+    if (state.cardio.secondsLeft <= 0) {
+      completeCardio(state.cardio.totalSeconds);
+    } else {
+      if (state.cardio.secondsLeft <= 3) beep(800 - state.cardio.secondsLeft * 60, 70, { type: "triangle", gain: 0.08 });
+      updateCardioDom();
+    }
+  }
+
+  function toggleCardioPause() {
+    if (!state.cardio) return;
+    state.cardio.paused = !state.cardio.paused;
+    render();
+  }
+
+  function completeCardio(elapsedSeconds) {
+    stopCardioTimer();
+    state.cardio = null;
+    beep(440, 400);
+    vibrate([120, 60, 120]);
+    var minutes = Math.max(1, Math.round(elapsedSeconds / 60));
+    var diff = getDifficulty(state.activeSession.difficulty_key || state.selectedDifficulty);
+    var calories = estimateCalories(diff.key, minutes, state.userSettings.weight_kg);
+    finishSession({ calories_estimate: calories, duration_minutes: minutes });
+  }
+
   // ---------- render ----------
 
   var lastRenderedView = null;
@@ -1530,7 +1603,7 @@
   }
 
   function render() {
-    if (state.view !== "workout") { stopWorkoutTimer(); stopCircuitTimer(); }
+    if (state.view !== "workout") { stopWorkoutTimer(); stopCircuitTimer(); stopCardioTimer(); }
     if (state.view !== "benessere") {
       stopBreathingTimer(); state.breathing = null;
       stopMeditationTimer(); state.meditation = null;
@@ -1619,7 +1692,8 @@
 
     if (state.view === "workout" && state.activeSession) {
       startWorkoutTimer(state.activeSession.started_at);
-      if (isCircuitSession()) startCircuitTimer();
+      if (state.activeSession.session_type === "cardio") startCardioTimer();
+      else if (isCircuitSession()) startCircuitTimer();
     }
 
     ensureVideosPlay();
@@ -2120,6 +2194,7 @@
   function renderWorkoutDetail() {
     var w = state.currentWorkout;
     var isPreset = w.kind === "preset";
+    var isCardioPreset = isPreset && w.data.session_type === "cardio";
     var hasLinkedPersonal = isPreset && !!w.linkedPersonal;
     var mode = hasLinkedPersonal ? state.workoutViewMode : "preset";
     var viewData = (hasLinkedPersonal && mode === "personal") ? w.linkedPersonal : w.data;
@@ -2140,6 +2215,39 @@
       if (w.data.description) html += '<p class="page-sub">' + escapeHtml(w.data.description) + '</p>';
     } else {
       html += '<h1 class="page-title" style="margin-top:10px;">' + escapeHtml(viewData.name) + '</h1>';
+    }
+
+    if (isCardioPreset) {
+      html += '<h3 class="section-title" style="margin-top:14px;">Intensità</h3>';
+      html += '<div class="difficulty-grid">' +
+        DIFFICULTIES.map(function (d) {
+          return '<button class="difficulty-btn' + (state.selectedDifficulty === d.key ? " active" : "") + '" data-action="set-difficulty" data-value="' + d.key + '">' +
+            '<span class="difficulty-emoji">' + d.emoji + '</span><span class="difficulty-label">' + escapeHtml(d.label) + '</span>' +
+          '</button>';
+        }).join("") +
+      '</div>';
+
+      html += '<h3 class="section-title">Durata</h3>';
+      html += '<div class="difficulty-grid">' +
+        CARDIO_DURATIONS.map(function (mins) {
+          return '<button class="difficulty-btn' + (state.cardioSetup.durationMinutes === mins ? " active" : "") + '" data-action="set-cardio-duration" data-value="' + mins + '">' +
+            '<span class="difficulty-emoji">⏱️</span><span class="difficulty-label">' + mins + ' min</span>' +
+          '</button>';
+        }).join("") +
+      '</div>';
+
+      var estCals = estimateCalories(state.selectedDifficulty, state.cardioSetup.durationMinutes, state.userSettings.weight_kg);
+      html += '<div class="stats-row">' +
+        '<div class="stat-tile"><span class="num">' + state.cardioSetup.durationMinutes + '</span><span class="lbl">Minuti</span></div>' +
+        '<div class="stat-tile"><span class="num">~' + estCals + '</span><span class="lbl">Calorie stimate</span></div>' +
+      '</div>';
+      if (state.userSettings.weight_kg == null) {
+        html += '<p class="circuit-equipment-tip">⚠️ Stima approssimativa (peso non impostato, vai nel Profilo per una stima più precisa)</p>';
+      }
+
+      html += '<div style="height:70px;"></div>';
+      html += '<div class="fixed-cta"><button class="btn btn-cta" data-action="start-cardio" ' + (state.activeSession ? "disabled" : "") + '>Inizio</button></div>';
+      return html;
     }
 
     if (hasLinkedPersonal) {
@@ -2511,6 +2619,7 @@
   }
 
   function renderWorkout() {
+    if (state.activeSession && state.activeSession.session_type === "cardio") return renderCardioPlayer();
     if (state.circuit) return renderCircuitPlayer();
     if (state.sessionExercises.length === 0) {
       return '<div class="empty">Questo obiettivo non ha esercizi.<br>Aggiungili prima di allenarti.</div>';
@@ -2603,6 +2712,51 @@
     return html;
   }
 
+  function renderCardioPlayer() {
+    var c = state.cardio;
+    if (!c) return "";
+    var diff = getDifficulty(state.activeSession.difficulty_key || state.selectedDifficulty);
+    var pct = Math.max(0, Math.min(100, Math.round((c.secondsLeft / c.totalSeconds) * 100)));
+    var circumference = 2 * Math.PI * 28;
+    var ringOffset = circumference * (1 - pct / 100);
+    var mm = Math.floor(c.secondsLeft / 60);
+    var ss = c.secondsLeft % 60;
+    var elapsedMinutes = (c.totalSeconds - c.secondsLeft) / 60;
+    var calsSoFar = estimateCalories(diff.key, elapsedMinutes, state.userSettings.weight_kg);
+
+    var html = '<div class="circuit-top-row">' +
+      '<button class="back-btn" data-action="go-home">←</button>' +
+      '<div class="circuit-ring-wrap">' +
+        '<svg viewBox="0 0 64 64" class="circuit-ring">' +
+          '<circle class="circuit-ring-track" cx="32" cy="32" r="28"></circle>' +
+          '<circle class="circuit-ring-fill" id="cardio-ring-fill" cx="32" cy="32" r="28" stroke-dasharray="' + circumference.toFixed(2) + '" stroke-dashoffset="' + ringOffset.toFixed(2) + '"></circle>' +
+        '</svg>' +
+        '<span class="circuit-ring-number" id="cardio-time" style="font-size:17px;">' + mm + ':' + (ss < 10 ? "0" : "") + ss + '</span>' +
+      '</div>' +
+    '</div>';
+    html += '<div class="circuit-phase-tag work">' + diff.emoji + ' ' + escapeHtml(diff.label.toUpperCase()) + '</div>';
+    html += '<h2 class="circuit-exname">' + escapeHtml(state.activeSession.template_name) + '</h2>';
+
+    html += '<div class="stats-row" style="margin-top:10px;">' +
+      '<div class="stat-tile"><span class="num" id="cardio-minutes">' + Math.round(elapsedMinutes) + '</span><span class="lbl">Minuti</span></div>' +
+      '<div class="stat-tile"><span class="num" id="cardio-calories">~' + calsSoFar + '</span><span class="lbl">Calorie</span></div>' +
+    '</div>';
+
+    if (state.userSettings.weight_kg == null) {
+      html += '<p class="circuit-equipment-tip">⚠️ Stima approssimativa (peso non impostato, vai nel Profilo per una stima più precisa)</p>';
+    }
+
+    html += '<div style="height:150px;"></div>';
+    html += '<div class="fixed-cta">' +
+      '<div class="btn-row">' +
+        '<button class="btn btn-ghost" data-action="cardio-pause">' + (c.paused ? "▶ Riprendi" : "⏸ Pausa") + '</button>' +
+        '<button class="btn btn-accent" data-action="finish-cardio-early">Fine ✔</button>' +
+      '</div>' +
+      '<button class="btn btn-danger btn-small" data-action="cancel-session" style="width:100%;margin-top:8px;">Annulla allenamento</button>' +
+    '</div>';
+
+    return html;
+  }
 
   function renderHeatmap() {
     var weeksCount = 12;
@@ -2753,7 +2907,12 @@
     html += '<p class="page-sub">' + formatDate(s.started_at) +
       (s.finished_at ? " — durata " + durationText(s.started_at, s.finished_at) : " — in corso") + '</p>';
 
-    if (state.historyDetailExercises.length > 0) {
+    if (s.session_type === "cardio") {
+      html += '<div class="stats-row">' +
+        '<div class="stat-tile"><span class="num">' + (s.duration_minutes != null ? s.duration_minutes : "—") + '</span><span class="lbl">Minuti</span></div>' +
+        '<div class="stat-tile"><span class="num">' + (s.calories_estimate != null ? "~" + s.calories_estimate : "—") + '</span><span class="lbl">Calorie</span></div>' +
+      '</div>';
+    } else if (state.historyDetailExercises.length > 0) {
       html += '<p class="page-sub" style="margin-top:-8px;">Esercizi di questo circuito:</p>';
       state.historyDetailExercises.forEach(function (ex) {
         html += '<div class="exercise-row"><span class="name">' + escapeHtml(ex.name) + '</span>' +
@@ -2786,10 +2945,17 @@
       '</div>';
     }
 
-    html += '<div class="stats-row" style="margin-top:18px;">' +
-      '<div class="stat-tile"><span class="num">' + sum.durationText + '</span><span class="lbl">Durata</span></div>' +
-      '<div class="stat-tile"><span class="num">' + sum.exerciseCount + '</span><span class="lbl">Esercizi</span></div>' +
-    '</div>';
+    if (sum.isCardio) {
+      html += '<div class="stats-row" style="margin-top:18px;">' +
+        '<div class="stat-tile"><span class="num">' + sum.durationMinutes + '</span><span class="lbl">Minuti</span></div>' +
+        '<div class="stat-tile"><span class="num">~' + sum.caloriesEstimate + '</span><span class="lbl">Calorie</span></div>' +
+      '</div>';
+    } else {
+      html += '<div class="stats-row" style="margin-top:18px;">' +
+        '<div class="stat-tile"><span class="num">' + sum.durationText + '</span><span class="lbl">Durata</span></div>' +
+        '<div class="stat-tile"><span class="num">' + sum.exerciseCount + '</span><span class="lbl">Esercizi</span></div>' +
+      '</div>';
+    }
 
     if (sum.streak > 1) {
       html += '<div class="card session-summary-streak">🔥 ' + sum.streak + ' giorni di fila!</div>';
@@ -2995,6 +3161,14 @@
       '<div class="stat-tile"><span class="num">' + state.templates.length + '</span><span class="lbl">Obiettivi</span></div>' +
     '</div>';
 
+    html += '<h3 class="section-title">Dati fisici</h3>';
+    html += '<p class="page-sub" style="margin:0 0 8px;">Usato solo per stimare le calorie bruciate nelle sessioni cardio (es. tapis roulant).</p>';
+    html += '<form data-action="save-weight" style="display:flex;gap:8px;align-items:flex-end;">' +
+      '<div style="flex:1;"><label>Peso corporeo (kg)</label>' +
+      '<input type="number" name="weight_kg" min="20" max="300" step="0.1" value="' + (state.userSettings.weight_kg != null ? state.userSettings.weight_kg : "") + '" placeholder="es. 70"></div>' +
+      '<button class="btn btn-accent btn-small" type="submit">Salva</button>' +
+    '</form>';
+
     html += '<h3 class="section-title">Aspetto</h3>';
     html += '<div class="theme-row">';
     THEMES.forEach(function (th) {
@@ -3199,6 +3373,25 @@
     });
   }
 
+  function loadUserSettings() {
+    return sb.from("user_settings").select("*").eq("user_id", state.user.id).then(function (res) {
+      if (res.error) throw res.error;
+      state.userSettings = res.data && res.data[0] ? res.data[0] : { weight_kg: null };
+    });
+  }
+
+  function saveWeight(kg) {
+    withBusy(function () {
+      state.authError = "";
+      return sb.from("user_settings").upsert({ user_id: state.user.id, weight_kg: kg, updated_at: new Date().toISOString() }, { onConflict: "user_id" }).select().single()
+        .then(function (res) {
+          if (res.error) throw res.error;
+          state.userSettings = res.data;
+          showFlash("Peso salvato");
+        });
+    });
+  }
+
   function loadHomeData() {
     state.authError = "";
     return Promise.all([loadTemplates(), loadActiveSession(), loadHistory(), loadPresets(), loadLibraryExercises(), loadFavorites()]).then(function () {
@@ -3212,7 +3405,7 @@
 
   function loadPlanData() {
     state.authError = "";
-    return Promise.all([loadTemplates(), loadActiveSession(), loadWeeklyPlan(), loadHistory(), loadDashboardMessages()]).then(function () {
+    return Promise.all([loadTemplates(), loadActiveSession(), loadWeeklyPlan(), loadHistory(), loadDashboardMessages(), loadUserSettings()]).then(function () {
       state.view = "plan";
     });
   }
@@ -3476,10 +3669,11 @@
     vibrate([70, 40, 70, 40, 220]);
   }
 
-  function finishSession() {
+  function finishSession(extraFields) {
     withBusy(function () {
       state.authError = "";
       var s = state.activeSession;
+      var isCardio = s.session_type === "cardio";
       var startedAt = s.started_at;
       var templateName = s.template_name;
       var exerciseCount = state.sessionExercises.length;
@@ -3489,7 +3683,10 @@
       var series = state.activeSeries;
       var levelBefore = series ? series.levelBefore : computeLevel(countSessionsInRange(season.start, season.end)).level;
 
-      return sb.from("workout_sessions").update({ finished_at: new Date().toISOString() }).eq("id", s.id).select().single()
+      var updatePayload = { finished_at: new Date().toISOString() };
+      if (extraFields) { for (var k in extraFields) { if (extraFields.hasOwnProperty(k)) updatePayload[k] = extraFields[k]; } }
+
+      return sb.from("workout_sessions").update(updatePayload).eq("id", s.id).select().single()
         .then(function (res) {
           if (res.error) throw res.error;
           var finishedAt = res.data.finished_at;
@@ -3521,6 +3718,9 @@
               templateName: templateName,
               durationText: durationText(startedAt, finishedAt),
               exerciseCount: exerciseCount,
+              isCardio: isCardio,
+              durationMinutes: extraFields ? extraFields.duration_minutes : null,
+              caloriesEstimate: extraFields ? extraFields.calories_estimate : null,
               streak: computeStreak(),
               leveledUp: newLevel.level > levelBefore,
               newLevel: newLevel.level,
@@ -3563,6 +3763,7 @@
         state.activeSession = null;
         state.sessionExercises = [];
         state.circuit = null;
+        state.cardio = null;
         state.activeSeries = null;
         state.seriesRest = null;
         state.view = "home";
@@ -4118,6 +4319,36 @@
     });
   }
 
+  function beginCardioSession() {
+    withBusy(function () {
+      state.authError = "";
+      var preset = state.currentWorkout.data;
+      var diff = getDifficulty(state.selectedDifficulty);
+      var minutes = state.cardioSetup.durationMinutes;
+      return sb.from("workout_sessions").insert({
+        user_id: state.user.id,
+        template_id: preset.id,
+        template_name: preset.name,
+        session_type: "cardio",
+        duration_minutes: minutes,
+        xp_weight: diff.xpWeight,
+        difficulty_key: diff.key,
+        exercise_count: 0
+      }).select().single().then(function (res) {
+        if (res.error) throw res.error;
+        state.activeSession = res.data;
+        state.cardio = { totalSeconds: minutes * 60, secondsLeft: minutes * 60, paused: false };
+        state.view = "workout";
+      });
+    });
+  }
+
+  function finishCardioEarly() {
+    if (!state.cardio) return;
+    if (!confirm("Terminare l'allenamento ora?")) return;
+    completeCardio(state.cardio.totalSeconds - state.cardio.secondsLeft);
+  }
+
   function personalizeWorkout() {
     withBusy(function () {
       state.authError = "";
@@ -4312,6 +4543,10 @@
       var peDuration = parseInt(form.exduration.value, 10);
       if (peName && !isNaN(peDuration)) { addPresetExercise(peName, peInstr, peDuration); form.reset(); form.exduration.value = "30"; }
     }
+    else if (action === "save-weight") {
+      var kg = parseFloat(form.weight_kg.value);
+      if (!isNaN(kg) && kg > 0) saveWeight(kg);
+    }
   });
 
   app.addEventListener("click", function (e) {
@@ -4356,6 +4591,10 @@
     else if (action === "open-workout") openWorkout(el.getAttribute("data-kind"), id);
     else if (action === "edit-workout-template") openTemplate(id);
     else if (action === "start-workout") startWorkout();
+    else if (action === "start-cardio") beginCardioSession();
+    else if (action === "cardio-pause") toggleCardioPause();
+    else if (action === "finish-cardio-early") finishCardioEarly();
+    else if (action === "set-cardio-duration") { state.cardioSetup.durationMinutes = parseInt(el.getAttribute("data-value"), 10); render(); }
     else if (action === "open-preset-admin") openPresetAdmin(id);
     else if (action === "delete-preset-exercise") deletePresetExercise(id);
     else if (action === "delete-preset-admin") deletePresetAdmin(id);

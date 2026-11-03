@@ -4287,7 +4287,8 @@
             order_index: i
           };
         });
-        return sb.from("template_exercises").insert(rows).select().then(function (res2) {
+        var insertExercises = rows.length > 0 ? sb.from("template_exercises").insert(rows).select() : Promise.resolve({ data: [], error: null });
+        return insertExercises.then(function (res2) {
           if (res2.error) throw res2.error;
           return loadTemplates().then(function () {
             return { id: newTplId, name: preset.name, category: category, rest_seconds: res.data.rest_seconds, source_preset_id: preset.id, image_url: res.data.image_url, exercises: res2.data };
@@ -4319,26 +4320,36 @@
     });
   }
 
+  function insertCardioSession(templateId, templateName) {
+    var diff = getDifficulty(state.selectedDifficulty);
+    var minutes = state.cardioSetup.durationMinutes;
+    return sb.from("workout_sessions").insert({
+      user_id: state.user.id,
+      template_id: templateId,
+      template_name: templateName,
+      session_type: "cardio",
+      duration_minutes: minutes,
+      xp_weight: diff.xpWeight,
+      difficulty_key: diff.key,
+      exercise_count: 0
+    }).select().single().then(function (res) {
+      if (res.error) throw res.error;
+      state.activeSession = res.data;
+      state.cardio = { totalSeconds: minutes * 60, secondsLeft: minutes * 60, paused: false };
+      state.view = "workout";
+    });
+  }
+
   function beginCardioSession() {
     withBusy(function () {
       state.authError = "";
-      var preset = state.currentWorkout.data;
-      var diff = getDifficulty(state.selectedDifficulty);
-      var minutes = state.cardioSetup.durationMinutes;
-      return sb.from("workout_sessions").insert({
-        user_id: state.user.id,
-        template_id: preset.id,
-        template_name: preset.name,
-        session_type: "cardio",
-        duration_minutes: minutes,
-        xp_weight: diff.xpWeight,
-        difficulty_key: diff.key,
-        exercise_count: 0
-      }).select().single().then(function (res) {
-        if (res.error) throw res.error;
-        state.activeSession = res.data;
-        state.cardio = { totalSeconds: minutes * 60, secondsLeft: minutes * 60, paused: false };
-        state.view = "workout";
+      var w = state.currentWorkout;
+      var preset = w.data;
+      if (w.linkedPersonal) {
+        return insertCardioSession(w.linkedPersonal.id, preset.name);
+      }
+      return clonePresetToPersonal(preset, [], state.currentCategory).then(function (tpl) {
+        return insertCardioSession(tpl.id, tpl.name);
       });
     });
   }

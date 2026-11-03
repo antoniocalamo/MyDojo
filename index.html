@@ -719,6 +719,21 @@
     overflow: hidden;
     background: #000;
   }
+  .cardio-illustration-wrap {
+    width: 100%;
+    max-width: 260px;
+    aspect-ratio: 1 / 1;
+    border-radius: var(--radius-lg);
+    margin: 10px auto;
+    overflow: hidden;
+    background: var(--surface-2);
+  }
+  .cardio-illustration {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+  }
   .exlib-detail-video {
     width: 100%;
     height: 100%;
@@ -2736,6 +2751,11 @@
     '</div>';
     html += '<div class="circuit-phase-tag work">' + diff.emoji + ' ' + escapeHtml(diff.label.toUpperCase()) + '</div>';
     html += '<h2 class="circuit-exname">' + escapeHtml(state.activeSession.template_name) + '</h2>';
+
+    var cardioImg = state.currentWorkout && state.currentWorkout.data ? state.currentWorkout.data.image_url : null;
+    if (cardioImg) {
+      html += '<div class="cardio-illustration-wrap"><img class="cardio-illustration" src="' + escapeHtml(cardioImg) + '" alt=""></div>';
+    }
 
     html += '<div class="stats-row" style="margin-top:10px;">' +
       '<div class="stat-tile"><span class="num" id="cardio-minutes">' + Math.round(elapsedMinutes) + '</span><span class="lbl">Minuti</span></div>' +

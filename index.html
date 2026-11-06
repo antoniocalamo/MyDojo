@@ -727,6 +727,11 @@
     margin: 10px auto;
     overflow: hidden;
     background: var(--surface-2);
+    animation: cardio-illustration-bounce 1.6s ease-in-out infinite;
+  }
+  @keyframes cardio-illustration-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
   }
   .cardio-illustration {
     width: 100%;
@@ -1893,6 +1898,17 @@
     return counts;
   }
 
+  function computeCardioTotals() {
+    var totals = { sessions: 0, minutes: 0, calories: 0 };
+    state.history.forEach(function (s) {
+      if (!s.finished_at || s.session_type !== "cardio") return;
+      totals.sessions += 1;
+      totals.minutes += (s.duration_minutes || 0);
+      totals.calories += (s.calories_estimate || 0);
+    });
+    return totals;
+  }
+
   function dayOfYear(d) {
     var start = new Date(d.getFullYear(), 0, 0);
     return Math.floor((d - start) / 86400000);
@@ -2838,6 +2854,15 @@
         '</div>';
       });
       html += '</div>';
+    }
+
+    var cardioTotals = computeCardioTotals();
+    if (cardioTotals.sessions > 0) {
+      html += '<h3 class="section-title">Cardio</h3>';
+      html += '<div class="stats-row">' +
+        '<div class="stat-tile"><span class="num">' + cardioTotals.minutes + '</span><span class="lbl">Minuti totali</span></div>' +
+        '<div class="stat-tile"><span class="num">~' + Math.round(cardioTotals.calories) + '</span><span class="lbl">Calorie totali</span></div>' +
+      '</div>';
     }
 
     var pastSeasons = getPastSeasons();

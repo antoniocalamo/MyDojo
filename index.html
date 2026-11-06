@@ -2765,7 +2765,7 @@
     html += '<div class="circuit-phase-tag work">' + diff.emoji + ' ' + escapeHtml(diff.label.toUpperCase()) + '</div>';
     html += '<h2 class="circuit-exname">' + escapeHtml(state.activeSession.template_name) + '</h2>';
 
-    var cardioImg = state.currentWorkout && state.currentWorkout.data ? state.currentWorkout.data.image_url : null;
+    var cardioImg = state.currentWorkout && state.currentWorkout.data ? state.currentWorkout.data.session_illustration_url : null;
     if (cardioImg) {
       html += '<div class="cardio-illustration-wrap"><img class="cardio-illustration" src="' + escapeHtml(cardioImg) + '" alt=""></div>';
     }

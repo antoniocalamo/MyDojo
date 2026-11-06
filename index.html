@@ -3447,7 +3447,7 @@
 
   function loadPlanData() {
     state.authError = "";
-    return Promise.all([loadTemplates(), loadActiveSession(), loadWeeklyPlan(), loadHistory(), loadDashboardMessages(), loadUserSettings()]).then(function () {
+    return Promise.all([loadTemplates(), loadActiveSession(), loadWeeklyPlan(), loadHistory(), loadDashboardMessages(), loadUserSettings(), loadPresets()]).then(function () {
       state.view = "plan";
     });
   }
@@ -3692,6 +3692,22 @@
   function resumeSession() {
     withBusy(function () {
       state.authError = "";
+      if (state.activeSession.session_type === "cardio") {
+        var personalTpl = state.templates.filter(function (t) { return t.id === state.activeSession.template_id; })[0];
+        var sourcePreset = personalTpl ? state.presets.filter(function (p) { return p.id === personalTpl.source_preset_id; })[0] : null;
+        if (sourcePreset) state.currentWorkout = { kind: "preset", data: sourcePreset, linkedPersonal: personalTpl };
+        if (state.cardio) { state.view = "workout"; return; }
+        var totalSeconds = (state.activeSession.duration_minutes || 0) * 60;
+        var elapsed = Math.floor((Date.now() - new Date(state.activeSession.started_at).getTime()) / 1000);
+        var secondsLeft = Math.max(0, totalSeconds - elapsed);
+        state.view = "workout";
+        if (secondsLeft <= 0) {
+          completeCardio(totalSeconds);
+        } else {
+          state.cardio = { totalSeconds: totalSeconds, secondsLeft: secondsLeft, paused: false };
+        }
+        return;
+      }
       if (state.circuit && state.sessionExercises.length > 0) {
         state.view = "workout";
         return;

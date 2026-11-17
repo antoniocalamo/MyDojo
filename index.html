@@ -104,6 +104,32 @@
   .btn-row { display: flex; gap: 8px; margin-top: 10px; }
   .btn-row .btn { width: auto; flex: 1; }
 
+  .countdown-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+  }
+  .countdown-mascot { width: 120px; height: 120px; animation: circuit-rest-bounce 1s ease-in-out infinite; }
+  .countdown-ready { margin: 14px 0 6px; font-size: 18px; font-weight: 700; color: var(--text-dim); }
+  .countdown-num {
+    font-size: 150px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--accent);
+    animation: countdown-pop 0.9s cubic-bezier(.2,1.5,.4,1) both;
+  }
+  .countdown-num.go { font-size: 110px; color: var(--text); }
+  @keyframes countdown-pop {
+    0% { transform: scale(0.3); opacity: 0; }
+    35% { transform: scale(1.12); opacity: 1; }
+    60% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(0.92); opacity: 0.85; }
+  }
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -1350,7 +1376,8 @@
     dojoToken: null,
     userSettings: { weight_kg: null },
     cardioSetup: { durationMinutes: 20 },
-    cardio: null
+    cardio: null,
+    countdown: null
   };
 
   try {
@@ -1363,6 +1390,7 @@
   var workoutTimerHandle = null;
   var circuitTimerHandle = null;
   var cardioTimerHandle = null;
+  var countdownTimerHandle = null;
   var breathingTimerHandle = null;
   var meditationTimerHandle = null;
   var audioCtx = null;
@@ -1500,8 +1528,51 @@
     }
   }
 
+  function countdownLabel(n) {
+    return n > 0 ? String(n) : "VIA!";
+  }
+
+  function stopCountdown() {
+    if (countdownTimerHandle) { clearInterval(countdownTimerHandle); countdownTimerHandle = null; }
+    state.countdown = null;
+  }
+
+  function startCountdown() {
+    stopCountdown();
+    state.countdown = 3;
+    beep(660, 120, { type: "triangle", gain: 0.1 });
+    vibrate(60);
+    countdownTimerHandle = setInterval(function () {
+      state.countdown -= 1;
+      if (state.countdown < 0) {
+        stopCountdown();
+        render();
+        return;
+      }
+      if (state.countdown === 0) {
+        beep(880, 110, { gain: 0.1 });
+        setTimeout(function () { beep(1320, 260, { gain: 0.1 }); }, 100);
+        vibrate([80, 40, 160]);
+      } else {
+        beep(660, 120, { type: "triangle", gain: 0.1 });
+        vibrate(60);
+      }
+      var numEl = document.getElementById("countdown-num");
+      if (numEl) numEl.outerHTML = '<div class="countdown-num' + (state.countdown === 0 ? " go" : "") + '" id="countdown-num">' + countdownLabel(state.countdown) + '</div>';
+    }, 1000);
+  }
+
+  function renderCountdownOverlay() {
+    if (state.view !== "workout" || state.countdown == null) return "";
+    return '<div class="countdown-overlay">' +
+      '<div class="countdown-mascot">' + mascotBadge(MASCOT_FULL, 90) + '</div>' +
+      '<p class="countdown-ready">Pronto?</p>' +
+      '<div class="countdown-num' + (state.countdown === 0 ? " go" : "") + '" id="countdown-num">' + countdownLabel(state.countdown) + '</div>' +
+    '</div>';
+  }
+
   function tickCircuit() {
-    if (!state.circuit || state.circuit.paused) return;
+    if (!state.circuit || state.circuit.paused || state.countdown != null) return;
     state.circuit.secondsLeft -= 1;
     if (state.circuit.secondsLeft <= 0) {
       advanceCircuitPhase();
@@ -1583,7 +1654,7 @@
   }
 
   function tickCardio() {
-    if (!state.cardio || state.cardio.paused) return;
+    if (!state.cardio || state.cardio.paused || state.countdown != null) return;
     state.cardio.secondsLeft -= 1;
     if (state.cardio.secondsLeft <= 0) {
       completeCardio(state.cardio.totalSeconds);
@@ -1620,7 +1691,7 @@
   }
 
   function render() {
-    if (state.view !== "workout") { stopWorkoutTimer(); stopCircuitTimer(); stopCardioTimer(); }
+    if (state.view !== "workout") { stopWorkoutTimer(); stopCircuitTimer(); stopCardioTimer(); stopCountdown(); }
     if (state.view !== "benessere") {
       stopBreathingTimer(); state.breathing = null;
       stopMeditationTimer(); state.meditation = null;
@@ -1690,7 +1761,8 @@
         body +
       '</main>' +
       (showNav ? renderBottomNav() : "") +
-      renderConfirmDeleteAllHistoryModal();
+      renderConfirmDeleteAllHistoryModal() +
+      renderCountdownOverlay();
 
     Array.prototype.forEach.call(app.querySelectorAll(".pill-row"), function (el, i) {
       if (pillScrollPositions[i] != null) el.scrollLeft = pillScrollPositions[i];
@@ -3685,6 +3757,7 @@
       }).then(function () {
         initCircuitIfNeeded();
         state.view = "workout";
+        startCountdown();
       });
     });
   }
@@ -4326,6 +4399,7 @@
       state.sessionExercises = applyStartOptions(exercisesForSession);
       initCircuitIfNeeded();
       state.view = "workout";
+      startCountdown();
     });
   }
 
@@ -4395,6 +4469,7 @@
       state.activeSession = res.data;
       state.cardio = { totalSeconds: minutes * 60, secondsLeft: minutes * 60, paused: false };
       state.view = "workout";
+      startCountdown();
     });
   }
 

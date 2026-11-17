@@ -3519,7 +3519,7 @@
 
   function loadPlanData() {
     state.authError = "";
-    return Promise.all([loadTemplates(), loadActiveSession(), loadWeeklyPlan(), loadHistory(), loadDashboardMessages(), loadUserSettings(), loadPresets()]).then(function () {
+    return Promise.all([loadTemplates(), loadActiveSession(), loadWeeklyPlan(), loadHistory(), loadDashboardMessages(), loadUserSettings(), loadPresets(), loadLibraryExercises()]).then(function () {
       state.view = "plan";
     });
   }

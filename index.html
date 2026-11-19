@@ -3092,11 +3092,17 @@
       html += '<div class="xp-recap-card">';
       html += '<p class="xp-recap-title">⚔️ Esperienza guadagnata</p>';
       html += '<div class="xp-recap-rows">';
-      html += '<div class="xp-recap-row"><span>XP base</span><span>' + sum.xpBase + '</span></div>';
-      if (sum.xpDelta > 0) {
-        html += '<div class="xp-recap-row xp-recap-bonus"><span>Bonus ' + escapeHtml(sum.difficultyEmoji) + ' ' + escapeHtml(sum.difficultyLabel) + '</span><span>+' + sum.xpDelta + '</span></div>';
-      } else if (sum.xpDelta < 0) {
-        html += '<div class="xp-recap-row xp-recap-malus"><span>Riduzione ' + escapeHtml(sum.difficultyEmoji) + ' ' + escapeHtml(sum.difficultyLabel) + '</span><span>' + sum.xpDelta + '</span></div>';
+      if (sum.seriesGroups) {
+        sum.seriesGroups.forEach(function (g, i) {
+          html += '<div class="xp-recap-row"><span>' + (i + 1) + '. ' + escapeHtml(g.name) + ' ' + escapeHtml(g.emoji) + '</span><span>' + g.xp + '</span></div>';
+        });
+      } else {
+        html += '<div class="xp-recap-row"><span>XP base</span><span>' + sum.xpBase + '</span></div>';
+        if (sum.xpDelta > 0) {
+          html += '<div class="xp-recap-row xp-recap-bonus"><span>Bonus ' + escapeHtml(sum.difficultyEmoji) + ' ' + escapeHtml(sum.difficultyLabel) + '</span><span>+' + sum.xpDelta + '</span></div>';
+        } else if (sum.xpDelta < 0) {
+          html += '<div class="xp-recap-row xp-recap-malus"><span>Riduzione ' + escapeHtml(sum.difficultyEmoji) + ' ' + escapeHtml(sum.difficultyLabel) + '</span><span>' + sum.xpDelta + '</span></div>';
+        }
       }
       html += '<div class="xp-recap-row xp-recap-total"><span>Totale</span><span>' + sum.xpTotal + ' XP</span></div>';
       html += '</div>';
@@ -3847,11 +3853,20 @@
           return Promise.all([loadTemplates(), loadHistory()]).then(function () {
             var seasonRow = seasonStatsRow(season.key);
             var newLevel = computeLevel(seasonRow ? seasonRow.sessions_count : 0);
+            var groups = series && series.groups ? series.groups.slice() : [];
+            groups.push({ name: templateName, xp: Math.round(BASE_XP_PER_SESSION * xpWeight), emoji: diffInfo.emoji, exercises: exerciseCount });
 
             if (series && series.position < series.templateIds.length - 1) {
               var nextIdx = series.position + 1;
               var nextTpl = state.templates.filter(function (t) { return t.id === series.templateIds[nextIdx]; })[0];
-              state.activeSeries = { templateIds: series.templateIds, position: nextIdx, levelBefore: series.levelBefore };
+              state.activeSeries = {
+                templateIds: series.templateIds,
+                position: nextIdx,
+                levelBefore: series.levelBefore,
+                weekday: series.weekday,
+                startedAt: series.startedAt || startedAt,
+                groups: groups
+              };
               state.seriesRest = {
                 completedIndex: series.position + 1,
                 total: series.templateIds.length,
@@ -3865,12 +3880,15 @@
             }
 
             state.activeSeries = null;
-            var xpTotal = Math.round(BASE_XP_PER_SESSION * xpWeight);
-            var xpDelta = xpTotal - BASE_XP_PER_SESSION;
+            var isSeries = groups.length > 1;
+            var xpBase = BASE_XP_PER_SESSION * groups.length;
+            var xpTotal = groups.reduce(function (sum, g) { return sum + g.xp; }, 0);
+            var xpDelta = xpTotal - xpBase;
             state.sessionSummary = {
-              templateName: templateName,
-              durationText: durationText(startedAt, finishedAt),
-              exerciseCount: exerciseCount,
+              templateName: isSeries ? groups.map(function (g) { return g.name; }).join(" + ") : templateName,
+              durationText: durationText(isSeries && series.startedAt ? series.startedAt : startedAt, finishedAt),
+              exerciseCount: groups.reduce(function (sum, g) { return sum + g.exercises; }, 0),
+              seriesGroups: isSeries ? groups : null,
               isCardio: isCardio,
               durationMinutes: extraFields ? extraFields.duration_minutes : null,
               caloriesEstimate: extraFields ? extraFields.calories_estimate : null,
@@ -3880,7 +3898,7 @@
               newTitle: newLevel.title,
               difficultyLabel: diffInfo.label,
               difficultyEmoji: diffInfo.emoji,
-              xpBase: BASE_XP_PER_SESSION,
+              xpBase: xpBase,
               xpDelta: xpDelta,
               xpTotal: xpTotal,
               currentTitle: newLevel.title,

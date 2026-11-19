@@ -2079,7 +2079,7 @@
       var missedFirst = missedDay.tpls[0];
       var missedAction = missedIsSeries
         ? 'data-action="preview-plan-day" data-weekday="' + missedDay.idx + '"'
-        : 'data-action="start-session" data-id="' + missedFirst.id + '"';
+        : 'data-action="start-session" data-id="' + missedFirst.id + '" data-weekday="' + missedDay.idx + '"';
       actionCard = '<div class="plan-action-card" style="background:' + gradientFor(missedFirst.id) + ';" ' + missedAction + '>' +
         '<span class="tag tag-solid">⏱️ Recupero</span>' +
         '<p class="action-title">' + escapeHtml(missedFirst.name) + (missedIsSeries ? ' +' + (missedDay.tpls.length - 1) + ' altri' : '') + '</p>' +
@@ -2102,7 +2102,7 @@
       var clickable = d.tpls.length > 0 && !state.activeSession;
       var clickAction = isSeries
         ? 'data-action="preview-plan-day" data-weekday="' + d.idx + '"'
-        : (d.tpl ? 'data-action="start-session" data-id="' + d.tpl.id + '"' : '');
+        : (d.tpl ? 'data-action="start-session" data-id="' + d.tpl.id + '" data-weekday="' + d.idx + '"' : '');
       html += '<div class="plan-day' + (isToday ? " today" : "") + (clickable ? " clickable" : "") + '"' +
         (clickable ? ' ' + clickAction : '') + '>' +
         (d.tpl && d.tpl.image_url ? '<img class="plan-day-banner goal" src="' + escapeHtml(d.tpl.image_url) + '" alt="" loading="lazy">' : '') +
@@ -2201,6 +2201,19 @@
       '</form>';
     } else if (assignments.length === 0) {
       html += '<div class="empty">Non hai ancora nessun obiettivo da assegnare.<br>Creane uno prima nel tab "Corpo".</div>';
+    }
+
+    if (assignments.length > 0) {
+      var currentDiffKey = assignments[0].difficulty_key || "normale";
+      html += '<h3 class="section-title" style="margin-top:14px;">Difficoltà del giorno</h3>';
+      html += '<p class="page-sub" style="margin:0 0 8px;">Si applica in automatico quando avvii l\'allenamento da "Il mio piano".</p>';
+      html += '<div class="difficulty-grid">' +
+        DIFFICULTIES.map(function (d) {
+          return '<button type="button" class="difficulty-btn' + (currentDiffKey === d.key ? " active" : "") + '" data-action="set-plan-day-difficulty" data-weekday="' + idx + '" data-value="' + d.key + '">' +
+            '<span class="difficulty-emoji">' + d.emoji + '</span><span class="difficulty-label">' + escapeHtml(d.label) + '</span>' +
+          '</button>';
+        }).join("") +
+      '</div>';
     }
     return html;
   }
@@ -3565,9 +3578,24 @@
         if (!templateId) return null;
         if (existing.some(function (p) { return p.template_id === templateId; })) return null;
         var nextOrder = existing.length === 0 ? 0 : Math.max.apply(null, existing.map(function (p) { return p.order_index || 0; })) + 1;
-        return sb.from("weekly_plan").insert({ user_id: state.user.id, weekday: idx, template_id: templateId, order_index: nextOrder });
+        var difficultyKey = existing.length > 0 ? (existing[0].difficulty_key || null) : null;
+        return sb.from("weekly_plan").insert({ user_id: state.user.id, weekday: idx, template_id: templateId, order_index: nextOrder, difficulty_key: difficultyKey });
       }).then(function (res) {
         if (res && res.error) throw res.error;
+        return loadWeeklyPlan();
+      });
+    });
+  }
+
+  function setPlanDayDifficulty(weekday, diffKey) {
+    withBusy(function () {
+      state.authError = "";
+      var ids = state.weeklyPlan.filter(function (p) { return p.weekday === weekday; }).map(function (p) { return p.id; });
+      if (ids.length === 0) return null;
+      return Promise.all(ids.map(function (id) {
+        return sb.from("weekly_plan").update({ difficulty_key: diffKey }).eq("id", id);
+      })).then(function (results) {
+        results.forEach(function (r) { if (r && r.error) throw r.error; });
         return loadWeeklyPlan();
       });
     });
@@ -3610,27 +3638,27 @@
     render();
   }
 
-  function startSeries(templateIds) {
+  function startSeries(templateIds, weekday) {
     if (!templateIds || templateIds.length === 0) return;
     var season = getCurrentSeason();
     var seasonRow = seasonStatsRow(season.key);
     var levelBefore = computeLevel(seasonRow ? seasonRow.sessions_count : 0).level;
-    state.activeSeries = { templateIds: templateIds, position: 0, levelBefore: levelBefore };
-    startSession(templateIds[0]);
+    state.activeSeries = { templateIds: templateIds, position: 0, levelBefore: levelBefore, weekday: weekday };
+    startSession(templateIds[0], weekday);
   }
 
   function startSeriesForWeekday(weekday) {
     var assignments = state.weeklyPlan.filter(function (p) { return p.weekday === weekday; })
       .sort(function (a, b) { return (a.order_index || 0) - (b.order_index || 0); });
     var ids = assignments.map(function (a) { return a.template_id; }).filter(Boolean);
-    startSeries(ids);
+    startSeries(ids, weekday);
   }
 
   function continueSeries() {
     var series = state.activeSeries;
     state.seriesRest = null;
     if (!series) { state.view = "plan"; render(); return; }
-    startSession(series.templateIds[series.position]);
+    startSession(series.templateIds[series.position], series.weekday);
   }
 
 
@@ -3741,24 +3769,18 @@
     });
   }
 
-  function startSession(templateId) {
+  function startSession(templateId, weekday) {
     withBusy(function () {
       state.authError = "";
       var t = state.templates.filter(function (x) { return x.id === templateId; })[0];
-      return sb.from("workout_sessions").insert({
-        user_id: state.user.id,
-        template_id: templateId,
-        template_name: t.name,
-        rest_seconds: restSecondsFor(t)
-      }).select().single().then(function (res) {
-        if (res.error) throw res.error;
-        state.activeSession = res.data;
-        return loadSessionData(res.data.id, templateId);
-      }).then(function () {
-        initCircuitIfNeeded();
-        state.view = "workout";
-        startCountdown();
-      });
+      var assignment = weekday != null ? state.weeklyPlan.filter(function (p) { return p.weekday === weekday; })[0] : null;
+      var diff = getDifficulty((assignment && assignment.difficulty_key) || "normale");
+      return sb.from("template_exercises").select("*").eq("template_id", templateId).order("order_index", { ascending: true })
+        .then(function (res) {
+          if (res.error) throw res.error;
+          var adjusted = buildDifficultyExercises(res.data, diff.key);
+          return beginSession(templateId, t.name, adjusted, restSecondsFor(t), diff.xpWeight, diff.key);
+        });
     });
   }
 
@@ -4723,7 +4745,10 @@
     else if (action === "open-template") openTemplate(id);
     else if (action === "delete-exercise") deleteExercise(id);
     else if (action === "delete-template") deleteTemplate(id);
-    else if (action === "start-session") startSession(id);
+    else if (action === "start-session") {
+      var weekdayAttr = el.getAttribute("data-weekday");
+      startSession(id, weekdayAttr !== null ? parseInt(weekdayAttr, 10) : null);
+    }
     else if (action === "resume-session") resumeSession();
     else if (action === "finish-session") finishSession();
     else if (action === "dismiss-session-summary") dismissSessionSummary();
@@ -4781,6 +4806,7 @@
     else if (action === "toggle-favorite") toggleFavorite(id);
     else if (action === "set-workout-view-mode") { state.workoutViewMode = el.getAttribute("data-value"); render(); }
     else if (action === "set-difficulty") { state.selectedDifficulty = el.getAttribute("data-value"); render(); }
+    else if (action === "set-plan-day-difficulty") setPlanDayDifficulty(parseInt(el.getAttribute("data-weekday"), 10), el.getAttribute("data-value"));
     else if (action === "benessere-tab") {
       stopBreathingTimer(); state.breathing = null;
       stopMeditationTimer(); state.meditation = null;
